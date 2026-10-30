@@ -10,13 +10,14 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import shutil
 import uuid
 from dataclasses import asdict, dataclass, field
 from datetime import datetime, timezone
 from pathlib import Path
 
 from quantum_organizer import naming
-from quantum_organizer.models import MediaItem, Plan, PlanItem, Status
+from quantum_organizer.models import MediaItem, OpRecord, Plan, PlanItem, Status
 
 UNLOCATED_DIR = "未定位"
 
@@ -137,3 +138,70 @@ def build_plan(items: list[MediaItem], opts: PlanOptions) -> Plan:
         items=plan_items,
         counts=counts,
     )
+
+
+def apply_plan(
+    plan: Plan,
+    history,
+    options: PlanOptions | None = None,
+    dry_run: bool = False,
+    selection: list[str] | None = None,
+) -> OpRecord:
+    """Execute ``rename``/``move`` items of *plan*, recording every step in *history*.
+
+    Pre-flight writability is checked for the whole batch first: one unwritable target
+    aborts before any file is touched.
+    """
+    opts = options or PlanOptions(root=plan.root)
+    chosen = set(selection) if selection else None
+    actions = [
+        pi
+        for pi in plan.items
+        if pi.decision in ("rename", "move")
+        and (chosen is None or pi.item.path in chosen)
+        and pi.target_path
+    ]
+
+    for pi in actions:
+        target_parent = Path(pi.target_path).parent
+        if not _writable(target_parent):
+            raise PermissionError(f"target directory is not writable: {target_parent}")
+
+    op_id = history.begin("apply", plan.root, opts.to_json())
+    if dry_run:
+        history.finish(op_id, "planned")
+        return history.get(op_id)
+
+    seq = 0
+    failed = False
+    for pi in actions:
+        src = Path(pi.item.path)
+        dst = Path(pi.target_path)
+        try:
+            if opts.copy:
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.copy2(src, dst)
+                seq += 1
+                history.record_step(op_id, seq, "copy", str(src), str(dst), "done")
+                continue
+
+            intermediate = src
+            if src.name != dst.name:
+                renamed = src.with_name(dst.name)
+                shutil.move(str(src), str(renamed))
+                seq += 1
+                history.record_step(op_id, seq, "rename", str(src), str(renamed), "done")
+                intermediate = renamed
+
+            if intermediate.parent.resolve() != dst.parent.resolve():
+                dst.parent.mkdir(parents=True, exist_ok=True)
+                shutil.move(str(intermediate), str(dst))
+                seq += 1
+                history.record_step(op_id, seq, "move", str(intermediate), str(dst), "done")
+        except OSError as exc:
+            seq += 1
+            history.record_step(op_id, seq, "move", str(src), str(dst), "failed", str(exc))
+            failed = True
+
+    history.finish(op_id, "partial" if failed else "done")
+    return history.get(op_id)
