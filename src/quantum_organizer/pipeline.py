@@ -10,13 +10,13 @@ from __future__ import annotations
 
 import json
 import sqlite3
+from collections.abc import Callable
 from concurrent.futures import ThreadPoolExecutor
 from pathlib import Path
-from typing import Callable
 
 from quantum_organizer.geocode import Geocoder
-from quantum_organizer.metadata import ALL_EXTS, MediaExtractor
 from quantum_organizer.history import HistoryStore
+from quantum_organizer.metadata import ALL_EXTS, MediaExtractor
 from quantum_organizer.models import MediaItem, OpRecord, Plan, Status, UndoResult
 from quantum_organizer.organize import PlanOptions, apply_plan, build_plan
 
@@ -92,7 +92,11 @@ class Pipeline:
             stat = path.stat()
         except OSError:
             return MediaItem(
-                path=str(path), size=0, mtime=0.0, kind="image", status=Status.INVALID,
+                path=str(path),
+                size=0,
+                mtime=0.0,
+                kind="image",
+                status=Status.INVALID,
                 reason="unreadable",
             )
         cached = self._cache_get(path, stat.st_size, stat.st_mtime)
@@ -102,8 +106,12 @@ class Pipeline:
             item = self.extractor.extract(path)
         except OSError:
             item = MediaItem(
-                path=str(path), size=stat.st_size, mtime=stat.st_mtime, kind="image",
-                status=Status.INVALID, reason="unreadable",
+                path=str(path),
+                size=stat.st_size,
+                mtime=stat.st_mtime,
+                kind="image",
+                status=Status.INVALID,
+                reason="unreadable",
             )
         self._cache_put(item)
         return item
@@ -200,9 +208,7 @@ class Pipeline:
             from quantum_organizer.organize import options_fingerprint
 
             if options_fingerprint(options) != row[1]:
-                raise ValueError(
-                    "plan fingerprint mismatch for these options, rescan required"
-                )
+                raise ValueError("plan fingerprint mismatch for these options, rescan required")
         return Plan.from_json(row[0])
 
     # ------------------------------------------------------------------ history

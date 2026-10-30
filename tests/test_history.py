@@ -14,8 +14,12 @@ def test_record_and_read_back(store):
     op = store.begin("apply", "/photos", "{}")
     store.record_step(op, 1, "rename", "/photos/a.jpg", "/photos/a_江苏_南京_240815.jpg", "done")
     store.record_step(
-        op, 2, "move", "/photos/a_江苏_南京_240815.jpg",
-        "/photos/江苏/南京/a_江苏_南京_240815.jpg", "done",
+        op,
+        2,
+        "move",
+        "/photos/a_江苏_南京_240815.jpg",
+        "/photos/江苏/南京/a_江苏_南京_240815.jpg",
+        "done",
     )
     store.finish(op, "done")
     rec = store.get(op)

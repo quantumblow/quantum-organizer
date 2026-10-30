@@ -4,11 +4,11 @@ from __future__ import annotations
 
 import json
 from dataclasses import asdict, dataclass, field
-from enum import Enum
+from enum import StrEnum
 from typing import Any
 
 
-class Status(str, Enum):
+class Status(StrEnum):
     READY = "ready"
     SKIPPED = "skipped"
     INVALID = "invalid"
@@ -41,7 +41,7 @@ class MediaItem:
         return data
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "MediaItem":
+    def from_dict(cls, data: dict[str, Any]) -> MediaItem:
         payload = dict(data)
         payload["status"] = Status(payload.get("status", Status.READY))
         return cls(**payload)
@@ -65,7 +65,7 @@ class PlanItem:
         }
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "PlanItem":
+    def from_dict(cls, data: dict[str, Any]) -> PlanItem:
         return cls(
             item=MediaItem.from_dict(data["item"]),
             target_name=data.get("target_name"),
@@ -98,7 +98,7 @@ class Plan:
         return json.dumps(self.to_dict(), ensure_ascii=False, indent=2)
 
     @classmethod
-    def from_dict(cls, data: dict[str, Any]) -> "Plan":
+    def from_dict(cls, data: dict[str, Any]) -> Plan:
         return cls(
             plan_id=data["plan_id"],
             root=data["root"],
@@ -109,7 +109,7 @@ class Plan:
         )
 
     @classmethod
-    def from_json(cls, raw: str) -> "Plan":
+    def from_json(cls, raw: str) -> Plan:
         return cls.from_dict(json.loads(raw))
 
 

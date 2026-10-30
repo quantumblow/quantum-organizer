@@ -93,7 +93,9 @@ def scan(
     output: Path | None = typer.Option(None, "--output", "-o", help="unified output root"),
     recursive: bool = typer.Option(True, "--recursive/--no-recursive", help="scan subdirectories"),
     json_out: Path | None = typer.Option(None, "--json", help="write the plan as JSON"),
-    allow_estimate: bool = typer.Option(False, "--allow-estimate", help="allow city-centre estimate"),
+    allow_estimate: bool = typer.Option(
+        False, "--allow-estimate", help="allow city-centre estimate"
+    ),
 ) -> None:
     """Scan a directory and build a plan (never modifies files)."""
     opts = PlanOptions(
@@ -155,7 +157,9 @@ def apply(
 
     selection = None
     if select is not None:
-        selection = [line.strip() for line in select.read_text("utf-8").splitlines() if line.strip()]
+        selection = [
+            line.strip() for line in select.read_text("utf-8").splitlines() if line.strip()
+        ]
 
     record = pipeline.apply(plan, selection=selection, dry_run=dry_run, options=opts)
     typer.echo(f"op: {record.op_id}  status: {record.status}  steps: {len(record.steps)}")
@@ -171,7 +175,9 @@ def undo(
     """Undo one operation in reverse order; stop and report on the first inconsistency."""
     pipeline = _pipeline()
     try:
-        result = pipeline.undo(op_id=op, root=str(root.resolve()) if root else None, dry_run=dry_run)
+        result = pipeline.undo(
+            op_id=op, root=str(root.resolve()) if root else None, dry_run=dry_run
+        )
     except KeyError:
         typer.echo("nothing to undo")
         raise typer.Exit(EXIT_NOTHING) from None

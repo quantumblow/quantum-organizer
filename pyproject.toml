@@ -32,6 +32,17 @@ pythonpath = ["src"]
 [tool.ruff]
 line-length = 100
 
+[tool.ruff.lint]
+select = ["E", "F", "W", "I", "UP", "B", "SIM", "RUF"]
+ignore = [
+    "B008",          # Typer 的 Option()/Argument() 默认值就是这个用法
+    "RUF001", "RUF002", "RUF003",  # 注释/文档里的中文全角标点是故意写的
+]
+
+[tool.ruff.lint.per-file-ignores]
+"src/quantum_organizer/metadata.py" = ["BLE001"]   # 外部命令是尽力而为，失败即跳过
+"tests/*" = ["C408", "RUF059"]
+
 [tool.mypy]
 python_version = "3.12"
 files = ["src"]

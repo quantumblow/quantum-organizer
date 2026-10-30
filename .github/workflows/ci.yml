@@ -1,0 +1,27 @@
+name: CI
+on:
+  push: { branches: [main, feat/**] }
+  pull_request:
+jobs:
+  test:
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        python-version: ["3.12", "3.13"]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with: { python-version: "${{ matrix.python-version }}" }
+      - name: Install ffmpeg + exiftool
+        run: sudo apt-get update && sudo apt-get install -y ffmpeg libimage-exiftool-perl
+      - name: Install quantum-locator
+        run: pip install "quantum-locator>=0.1,<1"
+      - run: pip install -e ".[dev]"
+      - run: ruff check src tests
+      - run: mypy src
+      - run: pytest -q
+  docker:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -t quantum-organizer:ci .

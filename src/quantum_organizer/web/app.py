@@ -146,9 +146,7 @@ def create_app(state_dir: Path | str, data_root: str | None = None) -> FastAPI:
             if unknown:
                 raise HTTPException(status_code=400, detail=f"paths not in plan: {unknown[:3]}")
 
-        record = pipeline.apply(
-            plan, selection=req.paths, dry_run=req.dry_run, options=opts
-        )
+        record = pipeline.apply(plan, selection=req.paths, dry_run=req.dry_run, options=opts)
         return {
             "op_id": record.op_id,
             "status": record.status,

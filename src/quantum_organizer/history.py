@@ -9,7 +9,7 @@ from __future__ import annotations
 import os
 import shutil
 import sqlite3
-from datetime import datetime, timezone
+from datetime import UTC, datetime
 from pathlib import Path
 
 from quantum_organizer.models import OpRecord, StepRecord, UndoResult
@@ -40,7 +40,7 @@ CREATE INDEX IF NOT EXISTS idx_ops_root ON operations(root, id DESC);
 
 
 def _now() -> str:
-    return datetime.now(timezone.utc).isoformat(timespec="seconds")
+    return datetime.now(UTC).isoformat(timespec="seconds")
 
 
 class HistoryStore:
@@ -64,7 +64,7 @@ class HistoryStore:
                 " VALUES (?, ?, ?, ?, ?)",
                 (_now(), kind, root, options_json, "running"),
             )
-            return int(cur.lastrowid)
+            return int(cur.lastrowid or 0)
 
     def record_step(
         self,
@@ -124,7 +124,10 @@ class HistoryStore:
             root=row[4],
             options_json=row[5],
             status=row[6],
-            steps=[StepRecord(seq=s[0], action=s[1], src=s[2], dst=s[3], status=s[4], error=s[5]) for s in steps],
+            steps=[
+                StepRecord(seq=s[0], action=s[1], src=s[2], dst=s[3], status=s[4], error=s[5])
+                for s in steps
+            ],
         )
 
     def last(self, root: str | None = None) -> OpRecord | None:

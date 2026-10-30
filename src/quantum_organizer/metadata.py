@@ -20,16 +20,34 @@ from quantum_organizer import naming
 from quantum_organizer.models import MediaItem, Status
 
 IMAGE_EXTS = {
-    ".jpg", ".jpeg", ".png", ".dng", ".raw", ".tiff", ".tif", ".heic",
-    ".cr2", ".nef", ".arw", ".gif", ".bmp", ".webp",
+    ".jpg",
+    ".jpeg",
+    ".png",
+    ".dng",
+    ".raw",
+    ".tiff",
+    ".tif",
+    ".heic",
+    ".cr2",
+    ".nef",
+    ".arw",
+    ".gif",
+    ".bmp",
+    ".webp",
 }
 VIDEO_EXTS = {".mp4", ".mov", ".avi", ".mkv", ".wmv", ".flv", ".m4v", ".3gp", ".webm"}
 AUDIO_EXTS = {".mp3", ".wav", ".flac", ".aac", ".ogg", ".m4a", ".wma"}
 ALL_EXTS = IMAGE_EXTS | VIDEO_EXTS | AUDIO_EXTS
 
 _TIME_KEYS = (
-    "creation_time", "date", "DateTimeOriginal", "MediaCreateDate",
-    "TrackCreateDate", "creation_date", "CreateDate", "ModifyDate",
+    "creation_time",
+    "date",
+    "DateTimeOriginal",
+    "MediaCreateDate",
+    "TrackCreateDate",
+    "creation_date",
+    "CreateDate",
+    "ModifyDate",
 )
 
 _GPS_PAIR_RE = re.compile(r"([+-]?\d+\.?\d*)\s*([+-]?\d+\.?\d*)")
@@ -113,13 +131,13 @@ class MediaExtractor:
     # ------------------------------------------------------------------ helpers
 
     class _Stamp:
-        __slots__ = ("value", "source")
+        __slots__ = ("source", "value")
 
         def __init__(self, value: str, source: str) -> None:
             self.value = value
             self.source = source
 
-    def _pick_time(self, probe: dict | None, exif: dict | None) -> "_Stamp | None":
+    def _pick_time(self, probe: dict | None, exif: dict | None) -> _Stamp | None:
         if exif:
             for key in ("DateTimeOriginal", "CreateDate", "ModifyDate"):
                 value = exif.get(key)
@@ -147,10 +165,8 @@ class MediaExtractor:
     ) -> tuple[float | None, float | None, str | None]:
         if probe:
             tags = probe.get("format", {}).get("tags") or {}
-            if "location" in tags:
-                pair = self._parse_location(tags["location"])
-                if pair:
-                    return pair[0], pair[1], "ffprobe"
+            if "location" in tags and (pair := self._parse_location(tags["location"])):
+                return pair[0], pair[1], "ffprobe"
             for stream in probe.get("streams", []):
                 tags = stream.get("tags") or {}
                 if "location" in tags:
@@ -165,9 +181,12 @@ class MediaExtractor:
 
         if exif:
             lat, lon = exif.get("GPSLatitude"), exif.get("GPSLongitude")
-            if isinstance(lat, (int, float)) and isinstance(lon, (int, float)):
-                if (lat, lon) != (0, 0):
-                    return float(lat), float(lon), "exiftool"
+            if (
+                isinstance(lat, (int, float))
+                and isinstance(lon, (int, float))
+                and (lat, lon) != (0, 0)
+            ):
+                return float(lat), float(lon), "exiftool"
         return None, None, None
 
     @staticmethod
@@ -192,8 +211,14 @@ class MediaExtractor:
         try:
             result = subprocess.run(
                 [
-                    tool, "-v", "quiet", "-print_format", "json",
-                    "-show_format", "-show_streams", str(path),
+                    tool,
+                    "-v",
+                    "quiet",
+                    "-print_format",
+                    "json",
+                    "-show_format",
+                    "-show_streams",
+                    str(path),
                 ],
                 capture_output=True,
                 text=True,
@@ -234,7 +259,19 @@ class MediaExtractor:
             with tempfile.NamedTemporaryFile(mode="w", suffix=".srt", delete=False) as tmp:
                 tmp_path = tmp.name
             subprocess.run(
-                [tool, "-v", "error", "-i", str(path), "-map", "0:s:0", "-f", "srt", "-y", tmp_path],
+                [
+                    tool,
+                    "-v",
+                    "error",
+                    "-i",
+                    str(path),
+                    "-map",
+                    "0:s:0",
+                    "-f",
+                    "srt",
+                    "-y",
+                    tmp_path,
+                ],
                 capture_output=True,
                 timeout=60,
             )

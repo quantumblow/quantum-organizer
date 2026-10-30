@@ -12,8 +12,8 @@ import json
 import os
 import shutil
 import uuid
-from dataclasses import asdict, dataclass, field
-from datetime import datetime, timezone
+from dataclasses import asdict, dataclass
+from datetime import UTC, datetime
 from pathlib import Path
 
 from quantum_organizer import naming
@@ -39,7 +39,7 @@ class PlanOptions:
         return json.dumps(self.to_dict(), ensure_ascii=False, sort_keys=True)
 
     @classmethod
-    def from_dict(cls, data: dict) -> "PlanOptions":
+    def from_dict(cls, data: dict) -> PlanOptions:
         allowed = {f for f in cls.__dataclass_fields__}
         return cls(**{k: v for k, v in data.items() if k in allowed})
 
@@ -100,7 +100,9 @@ def build_plan(items: list[MediaItem], opts: PlanOptions) -> Plan:
         elif item.province is None or item.city is None:
             if opts.move_unlocated:
                 decision = "move"
-                target, conflict = _dedupe_target(source.parent / UNLOCATED_DIR / source.name, taken)
+                target, conflict = _dedupe_target(
+                    source.parent / UNLOCATED_DIR / source.name, taken
+                )
             else:
                 decision = "keep"
         else:
@@ -133,7 +135,7 @@ def build_plan(items: list[MediaItem], opts: PlanOptions) -> Plan:
     return Plan(
         plan_id=plan_id(),
         root=str(root),
-        created_at=datetime.now(timezone.utc).isoformat(timespec="seconds"),
+        created_at=datetime.now(UTC).isoformat(timespec="seconds"),
         options_fingerprint=options_fingerprint(opts),
         items=plan_items,
         counts=counts,
@@ -163,7 +165,9 @@ def apply_plan(
     ]
 
     for pi in actions:
-        target_parent = Path(pi.target_path).parent
+        target = pi.target_path
+        assert target is not None  # filtered above
+        target_parent = Path(target).parent
         if not _writable(target_parent):
             raise PermissionError(f"target directory is not writable: {target_parent}")
 
@@ -176,12 +180,19 @@ def apply_plan(
     failed = False
     for pi in actions:
         src = Path(pi.item.path)
-        dst = Path(pi.target_path)
+        target_path = pi.target_path
+        assert target_path is not None  # filtered above
+        dst = Path(target_path)
         if dst.exists() and dst.resolve() != src.resolve():
             # 绝不覆盖已存在的文件：即使计划时它还不存在（例如被另一条 keep 决策的文件占位）
             seq += 1
             history.record_step(
-                op_id, seq, "move", str(src), str(dst), "conflict",
+                op_id,
+                seq,
+                "move",
+                str(src),
+                str(dst),
+                "conflict",
                 f"target already exists: {dst}",
             )
             failed = True

@@ -11,9 +11,10 @@ import math
 import urllib.error
 import urllib.parse
 import urllib.request
+from collections.abc import Iterable
 from dataclasses import dataclass
 from pathlib import Path
-from typing import Any, Iterable, Sequence
+from typing import Any
 
 _CENTERS: list[dict[str, Any]] = []
 
@@ -112,12 +113,10 @@ class Geocoder:
         return self._locator
 
     def _remote(self, lat: float, lon: float) -> GeoResult | None:
-        query = urllib.parse.urlencode(
-            {"lon": lon, "lat": lat, "need_gcj02_convert": "true"}
-        )
+        query = urllib.parse.urlencode({"lon": lon, "lat": lat, "need_gcj02_convert": "true"})
         url = f"{self.remote_url}/api/v1/location?{query}"
         try:
-            with urllib.request.urlopen(url, timeout=5) as resp:  # noqa: S310
+            with urllib.request.urlopen(url, timeout=5) as resp:
                 data = json.loads(resp.read().decode("utf-8"))
         except (urllib.error.URLError, TimeoutError, ValueError, OSError):
             return None
