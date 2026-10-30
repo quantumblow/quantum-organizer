@@ -140,22 +140,6 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 | `QORG_STATE_DIR` | `~/.local/state/quantum-organizer` | 计划/历史/缓存位置 |
 | `QORG_GEOCODER_URL` | 空 | 设成 `http://host:8899` 改用外部 `quantum-locator` 服务 |
 
-## 桌面按钮（双击启动）
-
-`scripts/desktop-launch.sh` 是双击入口，`.desktop` 只指向它；本机图标放在
-`~/Cubbies/QuantumOrganizer.desktop`：
-
-```bash
-# 双击未运行时：预检 → 起容器 qorg-ui → 等 /healthz → 开浏览器 → 跟随日志
-# 双击已在运行时：菜单（打开浏览器 / 跟随日志 / 最近日志 / 重启 / 停止 / 退出，15s 无输入默认打开）
-bash scripts/desktop-launch.sh [start|stop|restart|status|logs [n]|open]
-PORT=8081 ./scripts/desktop-launch.sh start          # 换端口
-QORG_DATA_ROOTS="$HOME/Pictures:$HOME/Videos" ./scripts/desktop-launch.sh start   # 只授权相册
-```
-
-预检会拦下三种常见失败并给出可复制的修复命令：Docker 没起、缺 `quantum-organizer:dev` 镜像、
-端口被别的进程占用。入口日志在 `logs/desktop-launch.log`（已 gitignore），容器日志用 `docker logs qorg-ui`。
-
 ## 命名与改名
 
 归档目录（`<省>/<市>/`）始终会建；文件名后缀是可选的，WebUI 上有「重命名源文件」+
