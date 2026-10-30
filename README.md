@@ -87,6 +87,15 @@ qorg undo  --root ~/Pictures/messy
 qorg serve --data ~/Pictures --port 8080
 ```
 
+## Desktop launcher
+
+`scripts/desktop-launch.sh` is the double-click entry point (the `.desktop` file only points at it).
+Double-clicking starts the `qorg-ui` container, waits for `/healthz`, opens the browser and follows the
+logs; if it is already running you get a menu (open / logs / restart / stop). CLI form:
+`bash scripts/desktop-launch.sh start|stop|restart|status|logs [n]|open`. Preflight refuses to start
+when Docker is down, the image is missing, or the port belongs to another process — and prints the
+exact fix. Launcher log: `logs/desktop-launch.log`.
+
 ## Naming
 
 The archive folders (`<province>/<city>/`) are always created; the filename suffix is optional.
