@@ -177,6 +177,16 @@ def apply_plan(
     for pi in actions:
         src = Path(pi.item.path)
         dst = Path(pi.target_path)
+        if dst.exists() and dst.resolve() != src.resolve():
+            # 绝不覆盖已存在的文件：即使计划时它还不存在（例如被另一条 keep 决策的文件占位）
+            seq += 1
+            history.record_step(
+                op_id, seq, "move", str(src), str(dst), "conflict",
+                f"target already exists: {dst}",
+            )
+            failed = True
+            continue
+
         try:
             if opts.copy:
                 dst.parent.mkdir(parents=True, exist_ok=True)
@@ -185,19 +195,12 @@ def apply_plan(
                 history.record_step(op_id, seq, "copy", str(src), str(dst), "done")
                 continue
 
-            intermediate = src
-            if src.name != dst.name:
-                renamed = src.with_name(dst.name)
-                shutil.move(str(src), str(renamed))
-                seq += 1
-                history.record_step(op_id, seq, "rename", str(src), str(renamed), "done")
-                intermediate = renamed
-
-            if intermediate.parent.resolve() != dst.parent.resolve():
-                dst.parent.mkdir(parents=True, exist_ok=True)
-                shutil.move(str(intermediate), str(dst))
-                seq += 1
-                history.record_step(op_id, seq, "move", str(intermediate), str(dst), "done")
+            dst.parent.mkdir(parents=True, exist_ok=True)
+            # 一步原子移动：重命名与归档在同一次 move 里完成，避免"先改名再移动"的中间态撞名。
+            action = "rename" if src.parent.resolve() == dst.parent.resolve() else "move"
+            shutil.move(str(src), str(dst))
+            seq += 1
+            history.record_step(op_id, seq, action, str(src), str(dst), "done")
         except OSError as exc:
             seq += 1
             history.record_step(op_id, seq, "move", str(src), str(dst), "failed", str(exc))

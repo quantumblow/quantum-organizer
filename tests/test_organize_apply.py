@@ -45,7 +45,7 @@ def test_apply_renames_and_moves(env):
     assert rec.status == "done"
     target = media / "江苏" / "南京" / "a_江苏_南京_240815.jpg"
     assert target.exists() and not (media / "a.jpg").exists()
-    assert [s.action for s in rec.steps] == ["rename", "move"]
+    assert [s.action for s in rec.steps] == ["move"]  # 命名与归档在一次 move 内完成
     assert (media / "b.jpg").exists()  # 无省市：原地不动，不进 steps
 
 
