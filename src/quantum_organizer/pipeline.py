@@ -8,6 +8,7 @@ Province/city resolution is always re-run, because it is cheap and because
 
 from __future__ import annotations
 
+import contextlib
 import json
 import sqlite3
 from collections.abc import Callable
@@ -76,13 +77,26 @@ class Pipeline:
         with ThreadPoolExecutor(max_workers=self.concurrency) as pool:
             futures = [pool.submit(self._item_for, path) for path in files]
             for index, future in enumerate(futures, 1):
-                items.append(future.result())
+                try:
+                    items.append(future.result())
+                except Exception:  # 单个文件失败不能中断整批
+                    path = files[index - 1]
+                    items.append(
+                        MediaItem(
+                            path=str(path),
+                            size=0,
+                            mtime=0.0,
+                            kind="image",
+                            status=Status.INVALID,
+                            reason="unreadable",
+                        )
+                    )
                 if progress is not None and progress(index, total, files[index - 1].name) is False:
                     aborted = True
                     break
 
-        if aborted:
-            items = items[: len(items)]
+        # 进度回调返回 False 时只停止继续汇报：已提交的任务仍会跑完，绝不丢弃已扫结果
+        del aborted
 
         self._resolve_places(items)
         return build_plan(items, opts)
@@ -130,8 +144,9 @@ class Pipeline:
             item.city = geo.city
             item.geo_source = geo.source
             item.geo_boundary = geo.boundary
-            if geo.province is None:
-                item.reason = geo.reason or "outside_polygons"
+            if geo.province is None or geo.city is None:
+                # 只有省级数据（台湾）也要在报告里写原因，否则用户不知道为什么没归类
+                item.reason = geo.reason or "outside_city_data"
 
     # ------------------------------------------------------------------ cache
 
@@ -139,7 +154,7 @@ class Pipeline:
         with sqlite3.connect(self.cache_path) as conn:
             row = conn.execute(
                 "SELECT item_json FROM scan_cache WHERE path = ? AND size = ? AND mtime = ?",
-                (str(path), size, mtime),
+                (str(path.resolve()), size, mtime),
             ).fetchone()
         if not row:
             return None
@@ -164,25 +179,47 @@ class Pipeline:
         conn.execute(
             "CREATE TABLE IF NOT EXISTS plans ("
             " plan_id TEXT PRIMARY KEY, root TEXT NOT NULL, created_at TEXT NOT NULL,"
-            " options_fingerprint TEXT NOT NULL, json TEXT NOT NULL)"
+            " options_fingerprint TEXT NOT NULL, json TEXT NOT NULL,"
+            " options_json TEXT)"
         )
+        with contextlib.suppress(sqlite3.OperationalError):  # 已有该列
+            conn.execute("ALTER TABLE plans ADD COLUMN options_json TEXT")
         return conn
 
-    def save_plan(self, plan: Plan) -> str:
+    def save_plan(self, plan: Plan, options: PlanOptions | None = None) -> str:
+        """Persist the plan *and* the options it was built with.
+
+        执行语义（copy / output / move_unlocated）必须跟着计划走：否则换个进程执行时
+        会退回默认值，把 copy 计划变成 move，原件消失且不可恢复。
+        """
+        options_json = json.dumps(options.to_dict(), ensure_ascii=False) if options else None
         with self._plans_conn() as conn:
             conn.execute(
                 "INSERT OR REPLACE INTO plans"
-                " (plan_id, root, created_at, options_fingerprint, json)"
-                " VALUES (?, ?, ?, ?, ?)",
+                " (plan_id, root, created_at, options_fingerprint, json, options_json)"
+                " VALUES (?, ?, ?, ?, ?, ?)",
                 (
                     plan.plan_id,
                     plan.root,
                     plan.created_at,
                     plan.options_fingerprint,
                     plan.to_json(),
+                    options_json,
                 ),
             )
         return plan.plan_id
+
+    def load_plan_options(self, plan_id: str) -> PlanOptions:
+        """Read back the options a plan was created with; fail closed when missing."""
+        with self._plans_conn() as conn:
+            row = conn.execute(
+                "SELECT options_json FROM plans WHERE plan_id = ?", (plan_id,)
+            ).fetchone()
+        if row is None:
+            raise KeyError(f"no plan found for {plan_id}")
+        if not row[0]:
+            raise ValueError("plan has no stored options (re-run `qorg scan`)")
+        return PlanOptions.from_dict(json.loads(row[0]))
 
     def load_plan(
         self,

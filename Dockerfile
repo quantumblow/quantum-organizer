@@ -10,10 +10,16 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
       ffmpeg libimage-exiftool-perl \
     && rm -rf /var/lib/apt/lists/*
 
+# quantum-locator 需要先发布到 PyPI，或先 `python -m build` 出 wheel 放到 docker/wheels/
+ARG LOCATOR_SPEC="quantum-locator>=0.1,<1"
+
 WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
-RUN pip install --no-cache-dir --upgrade pip && pip install --no-cache-dir .
+COPY docker/wheels/ /tmp/wheels/
+RUN pip install --no-cache-dir --upgrade pip \
+    && (pip install --no-cache-dir /tmp/wheels/*.whl || pip install --no-cache-dir "$LOCATOR_SPEC") \
+    && pip install --no-cache-dir .
 
 # 可选：用外部 locator 服务代替内置解析
 # ENV QORG_GEOCODER_URL=http://quantum-locator:8899

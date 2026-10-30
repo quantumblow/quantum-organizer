@@ -138,27 +138,51 @@ def format_date(raw: str | None) -> str | None:
     return f"{year % 100:02d}{month:02d}{day:02d}"
 
 
+_CONFLICT_SUFFIX_RE = re.compile(r"_\d+$")
+
+
 def parse_existing(stem: str) -> tuple[str, str | None]:
     """Split an already-suffixed stem into ``(base_stem, old_suffix)``.
 
     ``IMG_1234_江苏_南京_240815`` -> ``("IMG_1234", "江苏_南京_240815")``;
     ``DSC_0047_140620_140620`` -> unchanged (numeric segments are not place names).
     """
-    match = _EXISTING_RE.match(stem)
+    # 冲突后缀（_2、_3 …）不是名字的一部分，先剥掉再判断，否则二次扫描会把它带进 stem
+    probe = _CONFLICT_SUFFIX_RE.sub("", stem)
+    match = _EXISTING_RE.match(probe) or _EXISTING_RE.match(stem)
     if not match:
         return stem, None
     suffix = f"{match.group('prov')}_{match.group('city')}_{match.group('date')}"
     return match.group("base"), suffix
 
 
-def build_name(stem: str, province: str, city: str, date: str, ext: str) -> str:
-    """Build the target filename, replacing (never stacking) an existing suffix."""
+def build_name(
+    stem: str, province: str, city: str, date: str, ext: str, max_bytes: int = 200
+) -> str:
+    """Build the target filename, replacing (never stacking) an existing suffix.
+
+    超长时只截 *stem*：省市与日期是归档依据，绝不能被截掉。
+    """
     if not province or not city:
         raise ValueError("province and city must be non-empty")
     if not date:
         raise ValueError("date must be non-empty")
     base, _old = parse_existing(stem)
-    return f"{base}_{province}_{city}_{date}{ext}"
+    base = sanitize(base)
+    tail = f"_{province}_{city}_{date}{ext}"
+    # 预留 3 字节给冲突后缀 _2.._99，避免 dedupe 把名字顶过上限
+    budget = max_bytes - len(tail.encode("utf-8")) - 3
+    if budget <= 0:
+        raise ValueError(f"suffix alone exceeds {max_bytes} bytes: {tail}")
+    trimmed: list[str] = []
+    used = 0
+    for ch in base:
+        size = len(ch.encode("utf-8"))
+        if used + size > budget:
+            break
+        trimmed.append(ch)
+        used += size
+    return "".join(trimmed) + tail
 
 
 def sanitize(name: str, max_bytes: int = 200) -> str:

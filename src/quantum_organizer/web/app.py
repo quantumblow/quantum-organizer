@@ -76,6 +76,14 @@ def create_app(state_dir: Path | str, data_root: str | None = None) -> FastAPI:
             raise HTTPException(status_code=400, detail="root must be inside the data directory")
         if not root.exists():
             raise HTTPException(status_code=400, detail=f"root not found: {root}")
+        if req.output_dir is not None:
+            out = Path(req.output_dir)
+            if data_root is not None and not _inside(out, Path(data_root)):
+                raise HTTPException(
+                    status_code=400, detail="output_dir must be inside the data directory"
+                )
+            if not out.is_dir():
+                raise HTTPException(status_code=400, detail=f"output_dir not found: {out}")
 
         opts = PlanOptions(
             root=str(root),
@@ -95,7 +103,7 @@ def create_app(state_dir: Path | str, data_root: str | None = None) -> FastAPI:
             return True
 
         plan = pipeline.scan(opts, progress=progress)
-        pipeline.save_plan(plan)
+        pipeline.save_plan(plan, options=opts)
         app.state.options[plan.plan_id] = opts
         return {
             "plan_id": plan.plan_id,
@@ -139,7 +147,11 @@ def create_app(state_dir: Path | str, data_root: str | None = None) -> FastAPI:
         except KeyError:
             raise HTTPException(status_code=404, detail="plan not found") from None
 
-        opts: PlanOptions = app.state.options.get(plan_id) or PlanOptions(root=plan.root)
+        # 执行语义只认计划里存的选项；读不到就拒绝，绝不退回默认 move 语义
+        try:
+            opts: PlanOptions = pipeline.load_plan_options(plan.plan_id)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
         known = {i.item.path for i in plan.items}
         if req.paths is not None:
             unknown = [p for p in req.paths if p not in known]

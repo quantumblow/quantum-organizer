@@ -144,13 +144,21 @@ class HistoryStore:
 
     @staticmethod
     def _prune_empty_dirs(start: Path, root: Path) -> None:
-        """Remove directories this operation created, stopping at the operation root."""
+        """Remove directories this operation created, never outside the operation root.
+
+        ``--output`` 可能把文件放到 root 之外，撤销时绝不能往上删到别人的目录。
+        """
+        try:
+            root_resolved = root.resolve()
+        except OSError:
+            return
         current = start
         while True:
             try:
-                if current.resolve() == root.resolve():
-                    return
+                resolved = current.resolve()
             except OSError:
+                return
+            if resolved == root_resolved or root_resolved not in resolved.parents:
                 return
             try:
                 current.rmdir()  # only succeeds when empty

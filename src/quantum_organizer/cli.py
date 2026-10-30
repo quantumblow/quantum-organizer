@@ -93,6 +93,8 @@ def scan(
     output: Path | None = typer.Option(None, "--output", "-o", help="unified output root"),
     recursive: bool = typer.Option(True, "--recursive/--no-recursive", help="scan subdirectories"),
     json_out: Path | None = typer.Option(None, "--json", help="write the plan as JSON"),
+    copy: bool = typer.Option(False, "--copy", help="copy instead of move"),
+    move_unlocated: bool = typer.Option(False, "--move-unlocated", help="collect unlocated files"),
     allow_estimate: bool = typer.Option(
         False, "--allow-estimate", help="allow city-centre estimate"
     ),
@@ -102,11 +104,13 @@ def scan(
         root=str(root),
         output_dir=str(output) if output else None,
         recursive=recursive,
+        copy=copy,
+        move_unlocated=move_unlocated,
         allow_estimate=allow_estimate,
     )
     pipeline = _pipeline(allow_estimate=allow_estimate)
     plan = pipeline.scan(opts)
-    pipeline.save_plan(plan)
+    pipeline.save_plan(plan, options=opts)
 
     _print_preview(plan)
     typer.echo(f"plan: {plan.plan_id}  counts: {plan.counts}")
@@ -127,27 +131,20 @@ def apply(
     select: Path | None = typer.Option(None, "--select", help="file with one path per line"),
     dry_run: bool = typer.Option(False, "--dry-run", help="show what would happen"),
     yes: bool = typer.Option(False, "--yes", help="confirm execution"),
-    copy: bool = typer.Option(False, "--copy", help="copy instead of move"),
-    move_unlocated: bool = typer.Option(False, "--move-unlocated", help="collect unlocated files"),
-    output: Path | None = typer.Option(None, "--output", "-o", help="unified output root"),
     allow_estimate: bool = typer.Option(False, "--allow-estimate"),
 ) -> None:
-    """Execute the latest plan for *root* as one undoable operation."""
-    opts = PlanOptions(
-        root=str(root),
-        output_dir=str(output) if output else None,
-        copy=copy,
-        move_unlocated=move_unlocated,
-        allow_estimate=allow_estimate,
-    )
-    pipeline = _pipeline(allow_estimate=allow_estimate)
+    """Execute the latest plan for *root* as one undoable operation.
 
+    执行语义来自 `qorg scan` 时存下的选项（--copy/--output/--move-unlocated 在 scan 上传）。
+    """
     if not dry_run and not yes:
         typer.echo("preview only; re-run with --yes to confirm")
         raise typer.Exit(EXIT_BLOCKED)
 
+    pipeline = _pipeline(allow_estimate=allow_estimate)
     try:
-        plan = pipeline.load_plan(plan_id, str(root.resolve()), options=opts)
+        plan = pipeline.load_plan(plan_id, str(root.resolve()))
+        opts = pipeline.load_plan_options(plan.plan_id)
     except KeyError:
         typer.echo("no plan found, run `qorg scan` first")
         raise typer.Exit(EXIT_BLOCKED) from None

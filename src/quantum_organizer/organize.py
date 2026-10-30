@@ -109,7 +109,6 @@ def build_plan(items: list[MediaItem], opts: PlanOptions) -> Plan:
             target_name = naming.build_name(
                 source.stem, item.province, item.city, item.shoot_time or "", source.suffix
             )
-            target_name = naming.sanitize(target_name)
             candidate = base / item.province / item.city / target_name
             if candidate.resolve() == source.resolve():
                 decision = "keep"

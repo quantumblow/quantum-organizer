@@ -60,14 +60,16 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 | 命令 | 作用 |
 |---|---|
 | `qorg doctor` | 检查外部工具、locator 依赖、状态目录 |
-| `qorg scan ROOT [--json out.json]` | 扫描并生成计划（不改文件） |
-| `qorg apply ROOT --yes` | 执行该目录最新计划，一条操作记录 |
+| `qorg scan ROOT [--copy] [-o DIR] [--json out.json]` | 扫描并生成计划（不改文件） |
+| `qorg apply ROOT --yes` | 执行该目录最新计划（沿用 scan 的选项），一条操作记录 |
 | `qorg undo --root ROOT` | 逆序撤销最近一次操作 |
 | `qorg serve --data DIR` | 启动 WebUI（8080） |
 
-`apply` 常用开关：`--dry-run`（只演示）、`--copy`（复制不移动）、
-`--output DIR`（统一输出）、`--move-unlocated`（未定位文件收进 `未定位/`）、
-`--allow-estimate`（允许用城市中心点估算，默认关闭）。
+`scan` 的开关决定这次整理的语义，并随计划一起存下来，`apply` 照着执行：
+`--copy`（复制不移动）、`--output DIR`（统一输出）、`--move-unlocated`
+（未定位文件收进 `未定位/`）、`--allow-estimate`（允许用城市中心点估算，默认关闭）。
+`apply` 另有 `--dry-run`（只演示）、`--yes`（确认）、`--select FILE`（只处理列表里的文件）。
+计划里没有存下选项（老计划）时 `apply` 会直接拒绝，不会退回默认的移动语义。
 
 退出码：`0` 成功、`1` 无可处理项、`2` 需要确认/计划缺失、`3` 部分失败。
 
