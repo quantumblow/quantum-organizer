@@ -199,7 +199,7 @@ function exportPlan() {
 <template>
   <main>
     <header>
-      <h1>qorg 素材整理</h1>
+      <h1>Quantum Organizer 素材整理</h1>
       <p class="sub">
         按 GPS 解析出的省/市归档；文件名可选补 <code>_省_市_YYMMDD</code>（段可拆），做错可一键撤销。
       </p>
