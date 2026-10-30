@@ -33,6 +33,7 @@ def test_undo_does_not_prune_outside_root(tmp_path):
     record = p.apply(plan, options=opts)
     assert p.undo(op_id=record.op_id).ok
     assert out.is_dir()
+    assert list(out.iterdir()) == []  # 里面创建的空目录被清理，out 本身保留
 
 
 # 2. 计划必须自带执行语义：换进程/换实例也不改 copy/move

@@ -6,6 +6,7 @@ Undo replays the steps in reverse order and stops at the first inconsistency.
 
 from __future__ import annotations
 
+import json
 import os
 import shutil
 import sqlite3
@@ -166,6 +167,20 @@ class HistoryStore:
                 return
             current = current.parent
 
+    @staticmethod
+    def _prune_boundary(record: OpRecord) -> Path:
+        """撤销时允许向上清理到的目录。
+
+        ``--output`` 会把文件放到 root 之外；这种情况下边界是 output_dir 本身，
+        绝不越过它往上删（用户可能在 output_dir 上面还有自己的目录）。
+        """
+        try:
+            opts = json.loads(record.options_json or "{}")
+        except ValueError:
+            opts = {}
+        output_dir = opts.get("output_dir") if isinstance(opts, dict) else None
+        return Path(output_dir) if output_dir else Path(record.root)
+
     def undo(self, op_id: int, dry_run: bool = False) -> UndoResult:
         record = self.get(op_id)
         if record.status == "undone":
@@ -173,6 +188,7 @@ class HistoryStore:
 
         reverted = 0
         conflicts: list[str] = []
+        boundary = self._prune_boundary(record)
 
         for step in sorted(record.steps, key=lambda s: s.seq, reverse=True):
             dst, src = Path(step.dst), Path(step.src)
@@ -203,7 +219,7 @@ class HistoryStore:
                 else:
                     shutil.move(str(dst), str(src))
                 self.set_step_status(op_id, step.seq, "reverted")
-                self._prune_empty_dirs(dst.parent, Path(record.root))
+                self._prune_empty_dirs(dst.parent, boundary)
                 reverted += 1
             except OSError as exc:
                 conflicts.append(f"{dst}: {exc}")
