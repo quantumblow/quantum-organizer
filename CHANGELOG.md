@@ -7,6 +7,9 @@
 - Preview by default; `apply` requires `--yes`; every apply is one undoable operation.
 - Photos (EXIF), videos (ffprobe) and DJI subtitle-track GPS.
 - Offline locator dependency, WGS84→GCJ02 conversion, district-level results for municipalities.
+- Renaming is optional: `--rename/--no-rename` plus `--name-parts province,city,time` (any
+  combination) in the CLI, a switch + three checkboxes in the WebUI, remembered locally.
+  Folders are still created when renaming is off, and re-runs never stack suffixes.
 - Atomic move per file; conflicts never overwrite; undo prunes created directories.
 - WebUI takes several media roots (`--data` repeatable, `QORG_DATA_ROOTS`) and ships a folder
   browser, so any folder under a declared root can be scanned without restarting the container.

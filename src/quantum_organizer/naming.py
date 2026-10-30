@@ -7,6 +7,7 @@ against the same golden cases in ``tests/fixtures/naming_cases.json``.
 from __future__ import annotations
 
 import re
+from collections.abc import Iterable
 
 PROVINCE_SHORT = {
     "内蒙古自治区": "内蒙古",
@@ -140,6 +141,42 @@ def format_date(raw: str | None) -> str | None:
 
 _CONFLICT_SUFFIX_RE = re.compile(r"_\d+$")
 
+#: 可以进文件名的段，顺序即拼接顺序。
+NAME_PARTS: tuple[str, ...] = ("province", "city", "time")
+
+_PART_ALIASES = {
+    "province": "province",
+    "prov": "province",
+    "province_name": "province",
+    "省": "province",
+    "city": "city",
+    "市": "city",
+    "time": "time",
+    "date": "time",
+    "shoot_time": "time",
+    "时间": "time",
+}
+
+
+def normalize_parts(parts: Iterable[str] | str | None) -> tuple[str, ...]:
+    """Normalise a user-supplied segment selection to canonical order.
+
+    Accepts ``None`` (all parts), an iterable of names, or a comma/space separated string.
+    """
+    if parts is None:
+        return NAME_PARTS
+    if isinstance(parts, str):
+        raw: list[str] = [p for p in re.split(r"[,，\s]+", parts) if p]
+    else:
+        raw = [str(p) for p in parts]
+    picked: set[str] = set()
+    for token in raw:
+        key = _PART_ALIASES.get(token.strip().lower())
+        if key is None:
+            raise ValueError(f"unknown name part: {token!r} (expected province/city/time)")
+        picked.add(key)
+    return tuple(part for part in NAME_PARTS if part in picked)
+
 
 def parse_existing(stem: str) -> tuple[str, str | None]:
     """Split an already-suffixed stem into ``(base_stem, old_suffix)``.
@@ -156,20 +193,52 @@ def parse_existing(stem: str) -> tuple[str, str | None]:
     return match.group("base"), suffix
 
 
+def _strip_suffix(stem: str, suffix: str) -> str:
+    """Return *stem* without the suffix we are about to write (never double-stacking).
+
+    先精确匹配即将生成的后缀（任意段组合都幂等），再退回旧的三段正则，
+    这样 ``IMG_江苏_南京`` 与 ``DSC_0047_140620`` 都不会被误剥。
+    """
+    probe = _CONFLICT_SUFFIX_RE.sub("", stem)
+    for candidate in (probe, stem):
+        if suffix and candidate.endswith("_" + suffix):
+            return candidate[: -len(suffix) - 1]
+    # 注意：这里必须回退到原始 *stem*，否则 IMG_1234 会被当成冲突后缀剥成 IMG
+    base, old = parse_existing(stem)
+    if old is not None:
+        return base
+    return stem
+
+
 def build_name(
-    stem: str, province: str, city: str, date: str, ext: str, max_bytes: int = 200
+    stem: str,
+    province: str,
+    city: str,
+    date: str,
+    ext: str,
+    max_bytes: int = 200,
+    parts: Iterable[str] | str | None = NAME_PARTS,
 ) -> str:
     """Build the target filename, replacing (never stacking) an existing suffix.
 
-    超长时只截 *stem*：省市与日期是归档依据，绝不能被截掉。
+    *parts* selects which segments go into the name (``province`` / ``city`` / ``time``);
+    pass an empty selection to keep the original name. 超长时只截 *stem*：后缀是归档依据。
     """
-    if not province or not city:
-        raise ValueError("province and city must be non-empty")
-    if not date:
-        raise ValueError("date must be non-empty")
-    base, _old = parse_existing(stem)
-    base = sanitize(base)
-    tail = f"_{province}_{city}_{date}{ext}"
+    selected = normalize_parts(parts)
+    if not selected:
+        return sanitize(stem) + ext
+    if "province" in selected and not province:
+        raise ValueError("province must be non-empty when selected")
+    if "city" in selected and not city:
+        raise ValueError("city must be non-empty when selected")
+    if "time" in selected and not date:
+        raise ValueError("date must be non-empty when selected")
+    segments = [
+        province if part == "province" else city if part == "city" else date for part in selected
+    ]
+    suffix = "_".join(segments)
+    base = sanitize(_strip_suffix(stem, suffix))
+    tail = f"_{suffix}{ext}"
     # 预留 3 字节给冲突后缀 _2.._99，避免 dedupe 把名字顶过上限
     budget = max_bytes - len(tail.encode("utf-8")) - 3
     if budget <= 0:

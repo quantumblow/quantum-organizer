@@ -94,6 +94,7 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 |---|---|
 | `qorg doctor` | 检查外部工具、locator 依赖、状态目录 |
 | `qorg scan ROOT [--copy] [-o DIR] [--json out.json]` | 扫描并生成计划（不改文件） |
+| `qorg scan ROOT --no-rename --name-parts province,city` | 同上，但只按目录归档、文件名原样 |
 | `qorg apply ROOT --yes` | 执行该目录最新计划（沿用 scan 的选项），一条操作记录 |
 | `qorg undo --root ROOT` | 逆序撤销最近一次操作 |
 | `qorg serve [--data DIR]...` | 启动 WebUI（8080），`--data` 可重复，缺省是 `~/Pictures`、`~/Videos` |
@@ -101,6 +102,8 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 `scan` 的开关决定这次整理的语义，并随计划一起存下来，`apply` 照着执行：
 `--copy`（复制不移动）、`--output DIR`（统一输出）、`--move-unlocated`
 （未定位文件收进 `未定位/`）、`--allow-estimate`（允许用城市中心点估算，默认关闭）。
+`--rename/--no-rename`（默认开）决定是否给源文件补后缀，`--name-parts` 从
+`province,city,time` 里挑段（默认三段全要，顺序固定；也可以写 `省,市`）。
 `apply` 另有 `--dry-run`（只演示）、`--yes`（确认）、`--select FILE`（只处理列表里的文件）。
 计划里没有存下选项（老计划）时 `apply` 会直接拒绝，不会退回默认的移动语义。
 
@@ -125,6 +128,20 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 |---|---|---|
 | `QORG_STATE_DIR` | `~/.local/state/quantum-organizer` | 计划/历史/缓存位置 |
 | `QORG_GEOCODER_URL` | 空 | 设成 `http://host:8899` 改用外部 `quantum-locator` 服务 |
+
+## 命名与改名
+
+归档目录（`<省>/<市>/`）始终会建；文件名后缀是可选的，WebUI 上有「重命名源文件」+
+「省 / 市 / 时间」三个勾选框，界面会实时显示示例名，并记住你上次的选择（存在浏览器本地）：
+
+| 勾选 | 结果 |
+|---|---|
+| 省 + 市 + 时间 | `IMG_1234_江苏_南京_140815.jpg` |
+| 省 + 市 | `IMG_1234_江苏_南京.jpg` |
+| 时间 | `IMG_1234_140815.jpg` |
+| 不勾（或关掉重命名） | `IMG_1234.jpg`，只按目录归档 |
+
+重复跑不会叠后缀；从三段切到两段会把旧的时间段去掉。规则细节见 `docs/rules/naming.md`。
 
 ## 常见问题
 

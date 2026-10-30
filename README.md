@@ -81,6 +81,22 @@ qorg undo  --root ~/Pictures/messy
 qorg serve --data ~/Pictures --port 8080
 ```
 
+## Naming
+
+The archive folders (`<province>/<city>/`) are always created; the filename suffix is optional.
+The WebUI has a "rename" switch plus `province / city / time` checkboxes, shows a live example and
+remembers your last choice locally:
+
+| Selected | Result |
+|---|---|
+| province + city + time (default) | `IMG_1234_江苏_南京_140815.jpg` |
+| province + city | `IMG_1234_江苏_南京.jpg` |
+| time | `IMG_1234_140815.jpg` |
+| none / rename off | `IMG_1234.jpg`, filed by folder only |
+
+CLI: `qorg scan ROOT --no-rename` or `--name-parts province,city`. Re-running never stacks suffixes.
+Rules live in `docs/rules/naming.md`.
+
 ## Troubleshooting
 
 **`attempt to write a readonly database`**

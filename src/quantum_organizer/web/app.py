@@ -18,6 +18,7 @@ from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
+from quantum_organizer import naming
 from quantum_organizer.geocode import Geocoder
 from quantum_organizer.organize import PlanOptions
 from quantum_organizer.pipeline import Pipeline
@@ -33,6 +34,8 @@ class PlanRequest(BaseModel):
     copy_files: bool = Field(False, alias="copy")
     move_unlocated: bool = False
     allow_estimate: bool = False
+    rename: bool = True
+    name_parts: list[str] = Field(default_factory=lambda: list(naming.NAME_PARTS))
 
 
 class ApplyRequest(BaseModel):
@@ -136,12 +139,19 @@ def create_app(
             if not out.is_dir():
                 raise HTTPException(status_code=400, detail=f"output_dir not found: {out}")
 
+        try:
+            parts = naming.normalize_parts(req.name_parts)
+        except ValueError as exc:
+            raise HTTPException(status_code=400, detail=str(exc)) from None
+
         opts = PlanOptions(
             root=str(root),
             output_dir=req.output_dir,
             copy=req.copy_files,
             move_unlocated=req.move_unlocated,
             allow_estimate=req.allow_estimate,
+            rename=req.rename,
+            name_parts=parts,
         )
         pipeline = pipeline_for(req.allow_estimate)
 

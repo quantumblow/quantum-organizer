@@ -11,6 +11,7 @@ from pathlib import Path
 
 import typer
 
+from quantum_organizer import naming
 from quantum_organizer.organize import PlanOptions
 from quantum_organizer.pipeline import Pipeline
 
@@ -157,8 +158,21 @@ def scan(
     allow_estimate: bool = typer.Option(
         False, "--allow-estimate", help="allow city-centre estimate"
     ),
+    rename: bool = typer.Option(
+        True, "--rename/--no-rename", help="append a suffix to source files (default: on)"
+    ),
+    name_parts: str = typer.Option(
+        "province,city,time",
+        "--name-parts",
+        help="suffix segments, any combination of: province,city,time",
+    ),
 ) -> None:
     """Scan a directory and build a plan (never modifies files)."""
+    try:
+        parts = naming.normalize_parts(name_parts)
+    except ValueError as exc:
+        typer.echo(f"invalid --name-parts: {exc}")
+        raise typer.Exit(EXIT_BLOCKED) from exc
     opts = PlanOptions(
         root=str(root),
         output_dir=str(output) if output else None,
@@ -166,6 +180,8 @@ def scan(
         copy=copy,
         move_unlocated=move_unlocated,
         allow_estimate=allow_estimate,
+        rename=rename,
+        name_parts=parts,
     )
     pipeline = _pipeline(allow_estimate=allow_estimate)
     plan = pipeline.scan(opts)

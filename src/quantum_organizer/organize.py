@@ -31,6 +31,10 @@ class PlanOptions:
     recursive: bool = True
     extensions: list[str] | None = None
     allow_estimate: bool = False
+    #: 是否给源文件补后缀；False 时只建省市文件夹，文件名原样保留
+    rename: bool = True
+    #: 后缀由哪些段组成：province / city / time 的任意组合
+    name_parts: tuple[str, ...] = naming.NAME_PARTS
 
     def to_dict(self) -> dict:
         return asdict(self)
@@ -106,8 +110,21 @@ def build_plan(items: list[MediaItem], opts: PlanOptions) -> Plan:
             else:
                 decision = "keep"
         else:
-            target_name = naming.build_name(
-                source.stem, item.province, item.city, item.shoot_time or "", source.suffix
+            parts = naming.normalize_parts(opts.name_parts) if opts.rename else ()
+            # 没有拍摄时间就不硬塞时间段，其余段照常
+            if "time" in parts and not item.shoot_time:
+                parts = tuple(part for part in parts if part != "time")
+            target_name = (
+                naming.build_name(
+                    source.stem,
+                    item.province,
+                    item.city,
+                    item.shoot_time or "",
+                    source.suffix,
+                    parts=parts,
+                )
+                if parts
+                else source.name
             )
             candidate = base / item.province / item.city / target_name
             if candidate.resolve() == source.resolve():

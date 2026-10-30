@@ -1,5 +1,5 @@
 <script setup>
-import { computed, onMounted, ref } from "vue";
+import { computed, onMounted, ref, watch } from "vue";
 import { applyPlan, createPlan, fetchItems, listRoots, undoOp } from "./api.js";
 import PreviewTable from "./components/PreviewTable.vue";
 import ProgressBar from "./components/ProgressBar.vue";
@@ -24,6 +24,43 @@ const message = ref("");
 const lastOp = ref(null);
 const elapsed = ref(0);
 
+// 命名选项：记住上次的选择（WebUI 侧），CLI 每次显式传参
+const NAMING_KEY = "qorg.naming.v1";
+const renameOn = ref(true);
+const parts = ref({ province: true, city: true, time: true });
+
+const nameParts = computed(() =>
+  ["province", "city", "time"].filter((key) => renameOn.value && parts.value[key]),
+);
+
+const exampleName = computed(() => {
+  const segments = [];
+  if (parts.value.province) segments.push("江苏");
+  if (parts.value.city) segments.push("南京");
+  if (parts.value.time) segments.push("240815");
+  if (!renameOn.value || !segments.length) return "IMG_1234.jpg（不改名）";
+  return `IMG_1234_${segments.join("_")}.jpg`;
+});
+
+function loadNaming() {
+  try {
+    const saved = JSON.parse(localStorage.getItem(NAMING_KEY) || "null");
+    if (!saved) return;
+    if (typeof saved.rename === "boolean") renameOn.value = saved.rename;
+    if (saved.parts) parts.value = { ...parts.value, ...saved.parts };
+  } catch {
+    /* 坏掉的本地存储不影响使用 */
+  }
+}
+
+function saveNaming() {
+  try {
+    localStorage.setItem(NAMING_KEY, JSON.stringify({ rename: renameOn.value, parts: parts.value }));
+  } catch {
+    /* 隐私模式下写不进去就算了 */
+  }
+}
+
 const canApply = computed(() => phase.value === "ready" && selected.value.size > 0);
 const totalPages = computed(() => Math.max(1, Math.ceil(total.value / pageSize)));
 
@@ -33,6 +70,7 @@ function humanTime(seconds) {
 }
 
 onMounted(async () => {
+  loadNaming();
   try {
     const data = await listRoots();
     roots.value = data.roots || [];
@@ -41,6 +79,8 @@ onMounted(async () => {
     error.value = String(e.message || e);
   }
 });
+
+watch([renameOn, parts], saveNaming, { deep: true });
 
 async function loadPage(targetPage = 1) {
   if (!planId.value) return;
@@ -70,9 +110,13 @@ async function scan() {
       copy: false,
       move_unlocated: false,
       allow_estimate: false,
+      rename: renameOn.value,
+      name_parts: nameParts.value,
     });
     planId.value = body.plan_id;
     counts.value = body.counts || {};
+    selected.value = new Set(); // 新计划换了文件，旧选择必须清掉
+    lastOp.value = null;
     const tick = setInterval(() => (elapsed.value = (performance.now() - started) / 1000), 250);
     await loadPage(1);
     clearInterval(tick);
@@ -152,7 +196,9 @@ function exportPlan() {
   <main>
     <header>
       <h1>qorg 素材整理</h1>
-      <p class="sub">按 GPS 解析出的省/市归档，文件名补 <code>_省_市_YYMMDD</code>，做错可一键撤销。</p>
+      <p class="sub">
+        按 GPS 解析出的省/市归档；文件名可选补 <code>_省_市_YYMMDD</code>（段可拆），做错可一键撤销。
+      </p>
     </header>
 
     <section class="card">
@@ -169,6 +215,28 @@ function exportPlan() {
           {{ phase === "scanning" ? "扫描中…" : "扫描" }}
         </button>
       </div>
+      <div class="row naming">
+        <label class="chk">
+          <input v-model="renameOn" type="checkbox" />
+          重命名源文件
+        </label>
+        <label class="chk" :class="{ dim: !renameOn }">
+          <input v-model="parts.province" type="checkbox" :disabled="!renameOn" />
+          省
+        </label>
+        <label class="chk" :class="{ dim: !renameOn }">
+          <input v-model="parts.city" type="checkbox" :disabled="!renameOn" />
+          市
+        </label>
+        <label class="chk" :class="{ dim: !renameOn }">
+          <input v-model="parts.time" type="checkbox" :disabled="!renameOn" />
+          时间
+        </label>
+        <span class="example">示例：{{ exampleName }}</span>
+      </div>
+      <p class="hint">
+        归档目录始终按省/市创建；关掉重命名就只按目录归档，文件名原样保留。
+      </p>
       <p v-if="roots.length" class="roots-hint">
         可访问根目录：{{ roots.join(" · ") }}
       </p>
@@ -266,6 +334,12 @@ button.ghost { background: transparent; }
 .filters .counts { color: var(--muted); margin-left: auto; }
 .actions { justify-content: flex-end; }
 .roots-hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
+.naming { margin-top: 14px; }
+.chk { display: inline-flex; gap: 6px; align-items: center; color: var(--ink); }
+.chk input { min-width: 0; width: 16px; height: 16px; accent-color: var(--accent); }
+.chk.dim { opacity: .45; }
+.example { color: var(--muted); font-size: 12px; margin-left: auto; }
+.hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 .ok { color: var(--ok); margin: 10px 0 0; }
 .err { color: var(--err); margin: 10px 0 0; }
 footer { color: var(--muted); font-size: 12px; }
