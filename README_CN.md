@@ -55,12 +55,11 @@ WebUI 能碰的目录由你决定，服务端会拒绝根目录之外的路径�
 **挂载了目录不等于允许访问。** 容器里 `-v "$HOME:$HOME"` 只是让路径在容器里存在；能浏览到哪、
 能扫描哪，由 `QORG_DATA_ROOTS` 决定，根目录之外一律 400。所以「挂了整个 home 但浏览只能用
 `-e` 里那几个目录」是设计如此，不是挂载失败——把 `-e QORG_DATA_ROOTS="$HOME"` 就放开了。
-本仓库的 `launch.sh` 默认就是整个 `$HOME`：
+想放开整个 home 就是这么一条：
 
 ```bash
-./launch.sh                                                   # 整个 $HOME
-QORG_DATA_ROOTS="$HOME/Pictures:$HOME/Videos" ./launch.sh     # 只放开相册
-PORT=8081 ./launch.sh                                         # 换端口
+docker run -d -p 8080:8080 -v "$HOME:$HOME" -v qorg-state:/state \
+  -e QORG_DATA_ROOTS="$HOME" ghcr.io/<org>/quantum-organizer
 ```
 - WebUI 的「浏览…」是按需列目录的，遇到没有读取权限的目录会提示换一个，不会让整次浏览失败
 

@@ -58,8 +58,12 @@ is rejected:
 **Mounting a directory is not the same as granting access.** `-v "$HOME:$HOME"` only makes the path
 exist inside the container; what you can browse and scan is decided by `QORG_DATA_ROOTS`, and
 anything outside those roots is a 400. So "home is mounted but only the `-e` dirs are browsable" is
-by design — widen it with `-e QORG_DATA_ROOTS="$HOME"`. This repo's `launch.sh` grants the whole
-`$HOME` by default (`QORG_DATA_ROOTS=... ./launch.sh` narrows it).
+by design — widen it with `-e QORG_DATA_ROOTS="$HOME"`:
+
+```bash
+docker run -d -p 8080:8080 -v "$HOME:$HOME" -v qorg-state:/state \
+  -e QORG_DATA_ROOTS="$HOME" ghcr.io/<org>/quantum-organizer
+```
 - **Browse…** lists folders on demand and reports unreadable ones instead of failing
 
 ```bash
