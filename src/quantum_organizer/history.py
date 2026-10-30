@@ -151,7 +151,14 @@ class HistoryStore:
             dst, src = Path(step.dst), Path(step.src)
             if step.status != "done":
                 continue
-            if not dst.exists() or src.exists():
+            if step.action == "copy":
+                # 复制步骤的源本来就在；只要副本还在就能回滚
+                if not dst.exists():
+                    conflicts.append(str(dst))
+                    if not dry_run:
+                        self.set_step_status(op_id, step.seq, "conflict")
+                    break
+            elif not dst.exists() or src.exists():
                 conflicts.append(str(dst))
                 if not dry_run:
                     self.set_step_status(op_id, step.seq, "conflict")
@@ -163,7 +170,8 @@ class HistoryStore:
             try:
                 src.parent.mkdir(parents=True, exist_ok=True)
                 if step.action == "copy":
-                    shutil.copy2(dst, src)
+                    if not src.exists():
+                        shutil.copy2(dst, src)
                     os.unlink(dst)
                 else:
                     shutil.move(str(dst), str(src))
