@@ -139,6 +139,22 @@ class HistoryStore:
 
     # ------------------------------------------------------------------ undo
 
+    @staticmethod
+    def _prune_empty_dirs(start: Path, root: Path) -> None:
+        """Remove directories this operation created, stopping at the operation root."""
+        current = start
+        while True:
+            try:
+                if current.resolve() == root.resolve():
+                    return
+            except OSError:
+                return
+            try:
+                current.rmdir()  # only succeeds when empty
+            except OSError:
+                return
+            current = current.parent
+
     def undo(self, op_id: int, dry_run: bool = False) -> UndoResult:
         record = self.get(op_id)
         if record.status == "undone":
@@ -176,6 +192,7 @@ class HistoryStore:
                 else:
                     shutil.move(str(dst), str(src))
                 self.set_step_status(op_id, step.seq, "reverted")
+                self._prune_empty_dirs(dst.parent, Path(record.root))
                 reverted += 1
             except OSError as exc:
                 conflicts.append(f"{dst}: {exc}")

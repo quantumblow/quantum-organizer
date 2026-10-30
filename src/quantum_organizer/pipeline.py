@@ -16,6 +16,7 @@ from typing import Callable
 
 from quantum_organizer.geocode import Geocoder
 from quantum_organizer.metadata import ALL_EXTS, MediaExtractor
+from quantum_organizer.history import HistoryStore
 from quantum_organizer.models import MediaItem, OpRecord, Plan, Status, UndoResult
 from quantum_organizer.organize import PlanOptions, apply_plan, build_plan
 
@@ -147,3 +148,89 @@ class Pipeline:
                 " VALUES (?, ?, ?, ?)",
                 (item.path, item.size, item.mtime, json.dumps(payload, ensure_ascii=False)),
             )
+
+    # ------------------------------------------------------------------ plans
+
+    def _plans_conn(self) -> sqlite3.Connection:
+        conn = sqlite3.connect(self.plans_path)
+        conn.execute(
+            "CREATE TABLE IF NOT EXISTS plans ("
+            " plan_id TEXT PRIMARY KEY, root TEXT NOT NULL, created_at TEXT NOT NULL,"
+            " options_fingerprint TEXT NOT NULL, json TEXT NOT NULL)"
+        )
+        return conn
+
+    def save_plan(self, plan: Plan) -> str:
+        with self._plans_conn() as conn:
+            conn.execute(
+                "INSERT OR REPLACE INTO plans"
+                " (plan_id, root, created_at, options_fingerprint, json)"
+                " VALUES (?, ?, ?, ?, ?)",
+                (
+                    plan.plan_id,
+                    plan.root,
+                    plan.created_at,
+                    plan.options_fingerprint,
+                    plan.to_json(),
+                ),
+            )
+        return plan.plan_id
+
+    def load_plan(
+        self,
+        plan_id: str | None,
+        root: str,
+        options: PlanOptions | None = None,
+    ) -> Plan:
+        with self._plans_conn() as conn:
+            if plan_id is None:
+                row = conn.execute(
+                    "SELECT json, options_fingerprint FROM plans WHERE root = ?"
+                    " ORDER BY rowid DESC LIMIT 1",
+                    (root,),
+                ).fetchone()
+            else:
+                row = conn.execute(
+                    "SELECT json, options_fingerprint FROM plans WHERE plan_id = ?", (plan_id,)
+                ).fetchone()
+        if row is None:
+            raise KeyError(f"no plan found for {plan_id or root}")
+
+        if options is not None:
+            from quantum_organizer.organize import options_fingerprint
+
+            if options_fingerprint(options) != row[1]:
+                raise ValueError(
+                    "plan fingerprint mismatch for these options, rescan required"
+                )
+        return Plan.from_json(row[0])
+
+    # ------------------------------------------------------------------ history
+
+    def history(self) -> HistoryStore:
+        return HistoryStore(self.history_path)
+
+    def apply(
+        self,
+        plan: Plan,
+        selection: list[str] | None = None,
+        dry_run: bool = False,
+        options: PlanOptions | None = None,
+    ) -> OpRecord:
+        return apply_plan(
+            plan, self.history(), options=options, dry_run=dry_run, selection=selection
+        )
+
+    def undo(
+        self,
+        op_id: int | None = None,
+        root: str | None = None,
+        dry_run: bool = False,
+    ) -> UndoResult:
+        hist = self.history()
+        if op_id is None:
+            latest = hist.last(root)
+            if latest is None:
+                raise KeyError("no operation to undo")
+            op_id = latest.op_id
+        return hist.undo(op_id, dry_run=dry_run)
