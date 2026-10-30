@@ -22,6 +22,10 @@ docker run --rm -p 8080:8080 \
 
 Open `http://localhost:8080`, enter `/data/2024-trip`, scan, review the table, apply, undo if needed.
 
+The image runs as uid/gid **1000**, so files it writes stay owned by you on the host instead of
+root. If your ids differ, pass `--user "$(id -u):$(id -g)"` and make sure `/state` is writable by
+that uid (the named volume inherits ownership 1000 from the image).
+
 ```bash
 docker run --rm -v /path/to/media:/data quantum-organizer:latest scan /data/2024-trip [--copy] [-o DIR]
 docker run --rm -v /path/to/media:/data quantum-organizer:latest apply /data/2024-trip --yes

@@ -24,6 +24,15 @@ RUN pip install --no-cache-dir --upgrade pip \
 # 可选：用外部 locator 服务代替内置解析
 # ENV QORG_GEOCODER_URL=http://quantum-locator:8899
 
+# 非 root 运行：容器写进素材目录的文件才不会变成 root 所有（宿主机 uid 通常是 1000）
+ARG APP_UID=1000
+ARG APP_GID=1000
+RUN groupadd -g ${APP_GID} qorg \
+    && useradd -u ${APP_UID} -g ${APP_GID} -m -s /usr/sbin/nologin qorg \
+    && mkdir -p /data /state \
+    && chown -R ${APP_UID}:${APP_GID} /data /state /app
+USER qorg
+
 EXPOSE 8080
 VOLUME ["/data", "/state"]
 HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \

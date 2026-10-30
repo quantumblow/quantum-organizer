@@ -10,6 +10,8 @@ services:
       - qorg-state:/state
     environment:
       - QORG_STATE_DIR=/state
+    # 宿主机 uid 不是 1000 时取消注释
+    # user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped
 
   # 可选：想独立维护/共享坐标服务时启用，再给主服务设 QORG_GEOCODER_URL
