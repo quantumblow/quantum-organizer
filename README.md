@@ -80,6 +80,12 @@ Python implementation and the planned mobile app.
 - No timezone inference in v0.1: video `creation_time` is usually UTC, so a midnight-crossing
   shoot can be off by a day; the report marks `time_source`.
 
+## CI
+
+Tests run on Python 3.12/3.13 with ruff + mypy; the docker job checks out
+`quantumblow/quantum-locator`, builds its wheel locally and then the image, and smoke-tests
+`qorg doctor` plus the locator import — so CI stays green before the locator is on PyPI.
+
 ## License
 
 MIT.
