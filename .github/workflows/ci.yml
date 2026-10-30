@@ -16,6 +16,8 @@ jobs:
           repository: quantumblow/quantum-locator
           ref: main
           path: locator
+          # 上游是私有仓库，默认 GITHUB_TOKEN 读不到它
+          token: ${{ secrets.LOCATOR_REPO_TOKEN }}
       - uses: actions/setup-python@v5
         with: { python-version: "${{ matrix.python-version }}" }
       - name: Install ffmpeg + exiftool
