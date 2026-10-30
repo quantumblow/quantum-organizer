@@ -26,6 +26,36 @@ The image runs as uid/gid **1000**, so files it writes stay owned by you on the 
 root. If your ids differ, pass `--user "$(id -u):$(id -g)"` and make sure `/state` is writable by
 that uid (the named volume inherits ownership 1000 from the image).
 
+### Pointing it at your own folders
+
+Paths inside the container are the host paths, so mount them at the same location:
+
+```bash
+# Mount the whole home directory once; then browse to any folder in the WebUI, no restart needed
+docker run --rm -p 8080:8080 \
+  -v "$HOME:$HOME" \
+  -v qorg-state:/state \
+  -e QORG_DATA_ROOTS="$HOME/Pictures:$HOME/Videos" \
+  ghcr.io/<org>/quantum-organizer
+```
+
+Mounting only the albums you care about works too, as long as the path stays identical:
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v "$HOME/Pictures:$HOME/Pictures" \
+  -v "$HOME/Videos:$HOME/Videos" \
+  -v qorg-state:/state \
+  ghcr.io/<org>/quantum-organizer
+```
+
+The WebUI can only touch roots you declare; anything else (including symlinks pointing out of a root)
+is rejected:
+
+- `qorg serve` with no arguments defaults to `~/Pictures` and `~/Videos` (falls back to `/data` in the image)
+- several roots: `--data ~/Pictures --data /mnt/nas/DCIM`, or `QORG_DATA_ROOTS="/a:/b"`
+- **Browse…** lists folders on demand and reports unreadable ones instead of failing
+
 ```bash
 docker run --rm -v /path/to/media:/data quantum-organizer:latest scan /data/2024-trip [--copy] [-o DIR]
 docker run --rm -v /path/to/media:/data quantum-organizer:latest apply /data/2024-trip --yes

@@ -24,6 +24,35 @@ docker run --rm -p 8080:8080 \
 如果你的宿主机用户名 id 不是 1000，用 `--user "$(id -u):$(id -g)"` 覆盖；`/state` 卷需要该 uid 可写：
 命名卷首次创建时会继承镜像里 1000 的属主，绑挂载目录则请先 `chown` 一次。
 
+### 想扫你自己电脑上的任意目录
+
+容器看到的路径就是宿主机路径，所以把目录按**同一条路径**挂进来最省事：
+
+```bash
+# 整份家目录挂进去，之后在 WebUI 里点「浏览…」想看哪个目录都行，不需要重启容器
+docker run --rm -p 8080:8080 \
+  -v "$HOME:$HOME" \
+  -v qorg-state:/state \
+  -e QORG_DATA_ROOTS="$HOME/Pictures:$HOME/Videos" \
+  ghcr.io/<org>/quantum-organizer
+```
+
+只挂一两个相册也可以，路径保持一致就行（撤销记录里的路径才和你在宿主机看到的一样）：
+
+```bash
+docker run --rm -p 8080:8080 \
+  -v "$HOME/Pictures:$HOME/Pictures" \
+  -v "$HOME/Videos:$HOME/Videos" \
+  -v qorg-state:/state \
+  ghcr.io/<org>/quantum-organizer
+```
+
+WebUI 能碰的目录由你决定，服务端会拒绝根目录之外的路径（包括指向根外的符号链接）：
+
+- 不给参数时，`qorg serve` 默认用 `~/Pictures` 和 `~/Videos`（存在则用，容器里都没有时退回 `/data`）
+- 多个根：`--data ~/Pictures --data /mnt/nas/DCIM`，或环境变量 `QORG_DATA_ROOTS="/a:/b"`
+- WebUI 的「浏览…」是按需列目录的，遇到没有读取权限的目录会提示换一个，不会让整次浏览失败
+
 命令行同样能跑（同一个镜像）：
 
 ```bash
@@ -67,7 +96,7 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 | `qorg scan ROOT [--copy] [-o DIR] [--json out.json]` | 扫描并生成计划（不改文件） |
 | `qorg apply ROOT --yes` | 执行该目录最新计划（沿用 scan 的选项），一条操作记录 |
 | `qorg undo --root ROOT` | 逆序撤销最近一次操作 |
-| `qorg serve --data DIR` | 启动 WebUI（8080） |
+| `qorg serve [--data DIR]...` | 启动 WebUI（8080），`--data` 可重复，缺省是 `~/Pictures`、`~/Videos` |
 
 `scan` 的开关决定这次整理的语义，并随计划一起存下来，`apply` 照着执行：
 `--copy`（复制不移动）、`--output DIR`（统一输出）、`--move-unlocated`
@@ -121,7 +150,7 @@ docker build --network=host \
 
 ## 部署
 
-- 单镜像单端口 8080，`/data` 素材、`/state` 状态，`HEALTHCHECK` 打 `/healthz`。
+- 单镜像单端口 8080，素材目录按需挂载（`/data` 只是缺省根），`/state` 放状态，`HEALTHCHECK` 打 `/healthz`。
 - `docker compose up -d`（见 `docker-compose.yml`），可用 `MEDIA_DIR` 指定素材目录。
 - 想独立维护坐标服务：启动 `quantum-locator` 容器并设 `QORG_GEOCODER_URL`。
 

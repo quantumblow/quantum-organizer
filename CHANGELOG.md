@@ -8,3 +8,6 @@
 - Photos (EXIF), videos (ffprobe) and DJI subtitle-track GPS.
 - Offline locator dependency, WGS84→GCJ02 conversion, district-level results for municipalities.
 - Atomic move per file; conflicts never overwrite; undo prunes created directories.
+- WebUI takes several media roots (`--data` repeatable, `QORG_DATA_ROOTS`) and ships a folder
+  browser, so any folder under a declared root can be scanned without restarting the container.
+  Defaults to `~/Pictures` and `~/Videos`; paths outside the declared roots are refused.

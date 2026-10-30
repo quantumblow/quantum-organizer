@@ -51,10 +51,52 @@ def _inside(child: Path, parent: Path) -> bool:
         return False
 
 
-def create_app(state_dir: Path | str, data_root: str | None = None) -> FastAPI:
+def _resolve_roots(
+    data_roots: list[str | Path] | None, data_root: str | Path | None
+) -> list[Path]:
+    """Normalise the configured media roots: expand, resolve, dedupe, keep order."""
+    raw: list[Path] = []
+    if data_roots:
+        raw.extend(Path(p) for p in data_roots)
+    if data_root:
+        raw.append(Path(data_root))
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for path in raw:
+        try:
+            resolved = path.expanduser().resolve()
+        except OSError:  # pragma: no cover - unreadable component
+            continue
+        if resolved in seen:
+            continue
+        seen.add(resolved)
+        out.append(resolved)
+    return out
+
+
+def create_app(
+    state_dir: Path | str,
+    data_root: str | None = None,
+    data_roots: list[str | Path] | None = None,
+) -> FastAPI:
     state = Path(state_dir)
     state.mkdir(parents=True, exist_ok=True)
+    roots = _resolve_roots(data_roots, data_root)
     app = FastAPI(title="quantum-organizer", version="0.1.0")
+
+    def _check(path: str | Path) -> Path:
+        """Resolve a browser-supplied path and make sure it lives in an allowed root."""
+        candidate = Path(path).expanduser()
+        try:
+            candidate = candidate.resolve()
+        except OSError:  # pragma: no cover - unreadable component
+            candidate = Path(path)
+        if roots and not any(_inside(candidate, root) for root in roots):
+            allowed = ", ".join(str(r) for r in roots)
+            raise HTTPException(
+                status_code=400, detail=f"path must be inside one of: {allowed}"
+            )
+        return candidate
 
     app.state.options = {}
     app.state.jobs = {}
@@ -71,17 +113,11 @@ def create_app(state_dir: Path | str, data_root: str | None = None) -> FastAPI:
 
     @app.post("/api/v1/plans")
     def create_plan(req: PlanRequest) -> dict[str, Any]:
-        root = Path(req.root)
-        if data_root is not None and not _inside(root, Path(data_root)):
-            raise HTTPException(status_code=400, detail="root must be inside the data directory")
+        root = _check(req.root)
         if not root.exists():
             raise HTTPException(status_code=400, detail=f"root not found: {root}")
         if req.output_dir is not None:
-            out = Path(req.output_dir)
-            if data_root is not None and not _inside(out, Path(data_root)):
-                raise HTTPException(
-                    status_code=400, detail="output_dir must be inside the data directory"
-                )
+            out = _check(req.output_dir)
             if not out.is_dir():
                 raise HTTPException(status_code=400, detail=f"output_dir not found: {out}")
 
@@ -213,16 +249,49 @@ def create_app(state_dir: Path | str, data_root: str | None = None) -> FastAPI:
 
     @app.get("/api/v1/roots")
     def list_roots() -> dict[str, Any]:
-        if data_root is None:
-            return {"roots": []}
-        base = Path(data_root)
-        if not base.exists():
-            return {"roots": []}
-        return {
-            "roots": sorted(
-                str(p) for p in base.iterdir() if p.is_dir() and not p.name.startswith(".")
-            )
-        }
+        return {"roots": [str(r) for r in roots], "home": str(Path.home())}
+
+    @app.get("/api/v1/browse")
+    def browse(path: str | None = Query(None)) -> dict[str, Any]:
+        """List sub-directories so the UI can pick a folder instead of typing a path."""
+        if path:
+            target = _check(path)
+        elif roots:
+            target = roots[0]
+        else:
+            target = Path.home().resolve()
+
+        if not target.exists():
+            raise HTTPException(status_code=400, detail=f"path not found: {target}")
+        if not target.is_dir():
+            raise HTTPException(status_code=400, detail=f"not a directory: {target}")
+
+        parent = (
+            str(target.parent)
+            if roots and any(_inside(target.parent, root) for root in roots)
+            else None
+        )
+
+        try:
+            entries = list(target.iterdir())
+        except PermissionError:
+            return {"path": str(target), "parent": parent, "dirs": [], "error": "permission_denied"}
+
+        dirs: list[dict[str, str]] = []
+        for entry in entries:
+            if entry.name.startswith("."):
+                continue
+            try:
+                if not entry.is_dir():
+                    continue
+                resolved = entry.resolve()
+            except OSError:  # 断链的符号链接
+                continue
+            if roots and not any(_inside(resolved, root) for root in roots):
+                continue  # 指向根外的符号链接，不展示
+            dirs.append({"name": entry.name, "path": str(entry)})
+        dirs.sort(key=lambda d: d["name"])
+        return {"path": str(target), "parent": parent, "dirs": dirs, "error": None}
 
     if STATIC_DIR.exists():
         app.mount("/", StaticFiles(directory=str(STATIC_DIR), html=True), name="static")

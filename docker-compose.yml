@@ -6,10 +6,16 @@ services:
     ports:
       - "8080:8080"
     volumes:
-      - ${MEDIA_DIR:-./data}:/data
+      # 容器里看到的路径 = 宿主机路径，撤销记录和日志才对得上
+      - "${HOME}/Pictures:${HOME}/Pictures"
+      - "${HOME}/Videos:${HOME}/Videos"
       - qorg-state:/state
     environment:
       - QORG_STATE_DIR=/state
+      - QORG_DATA_ROOTS=${HOME}/Pictures:${HOME}/Videos
+    # 想「一次启动、任意目录都能扫」：把下面两行打开，并注释掉上面的 Pictures/Videos 两行
+    #   volumes:  - "${HOME}:${HOME}"
+    #   environment: - QORG_DATA_ROOTS=${HOME}
     # 宿主机 uid 不是 1000 时取消注释
     # user: "${PUID:-1000}:${PGID:-1000}"
     restart: unless-stopped

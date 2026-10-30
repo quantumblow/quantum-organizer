@@ -32,6 +32,30 @@ def state_dir() -> Path:
     return Path(os.environ.get("QORG_STATE_DIR", DEFAULT_STATE_DIR))
 
 
+def media_roots(cli_roots: list[Path] | None) -> list[Path]:
+    """Decide which media roots the WebUI may touch.
+
+    Order of precedence: ``--data`` flags, ``QORG_DATA_ROOTS`` (``os.pathsep``-separated),
+    then the photographer defaults (~/Pictures, ~/Videos), then ``/data`` (the image workdir),
+    and finally the home directory.
+    """
+    if cli_roots:
+        return [Path(p).expanduser() for p in cli_roots]
+
+    env = os.environ.get("QORG_DATA_ROOTS")
+    if env:
+        return [Path(p).expanduser() for p in env.split(os.pathsep) if p.strip()]
+
+    home = Path.home()
+    defaults = [home / "Pictures", home / "Videos"]
+    existing = [p for p in defaults if p.is_dir()]
+    if existing:
+        return existing
+    if Path("/data").is_dir():
+        return [Path("/data")]
+    return [home]
+
+
 def _install_hint() -> str:
     if platform.system() == "Darwin":
         return "brew install ffmpeg exiftool"
@@ -190,7 +214,11 @@ def undo(
 
 @app.command()
 def serve(
-    data: Path = typer.Option(Path("/data"), "--data", help="media root the WebUI may touch"),
+    data: list[Path] | None = typer.Option(
+        None,
+        "--data",
+        help="media root the WebUI may touch; repeat for several (default: ~/Pictures, ~/Videos)",
+    ),
     port: int = typer.Option(8080, "--port"),
     host: str = typer.Option("0.0.0.0", "--host"),
 ) -> None:
@@ -199,7 +227,15 @@ def serve(
 
     from quantum_organizer.web.app import create_app
 
-    uvicorn.run(create_app(state_dir(), data_root=str(data)), host=host, port=port, workers=1)
+    roots = media_roots(data)
+    for root in roots:
+        typer.echo(f"root: {root}")
+    uvicorn.run(
+        create_app(state_dir(), data_roots=[str(r) for r in roots]),
+        host=host,
+        port=port,
+        workers=1,
+    )
 
 
 if __name__ == "__main__":  # pragma: no cover

@@ -13,6 +13,11 @@ export function listRoots() {
   return request("/api/v1/roots");
 }
 
+export function browse(path) {
+  const query = path ? `?path=${encodeURIComponent(path)}` : "";
+  return request(`/api/v1/browse${query}`);
+}
+
 export function createPlan(payload) {
   return request("/api/v1/plans", {
     method: "POST",

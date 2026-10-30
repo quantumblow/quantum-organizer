@@ -3,9 +3,11 @@ import { computed, onMounted, ref } from "vue";
 import { applyPlan, createPlan, fetchItems, listRoots, undoOp } from "./api.js";
 import PreviewTable from "./components/PreviewTable.vue";
 import ProgressBar from "./components/ProgressBar.vue";
+import DirectoryPicker from "./components/DirectoryPicker.vue";
 
 const roots = ref([]);
 const root = ref("");
+const picking = ref(false);
 const page = ref(1);
 const pageSize = 200;
 const decision = ref("");
@@ -156,14 +158,20 @@ function exportPlan() {
     <section class="card">
       <label for="root">素材目录</label>
       <div class="row">
-        <input id="root" v-model="root" list="roots" placeholder="/data/2024旅行" />
+        <input id="root" v-model="root" list="roots" placeholder="/home/you/Pictures/2024旅行" />
         <datalist id="roots">
           <option v-for="r in roots" :key="r" :value="r" />
         </datalist>
+        <button class="ghost" :disabled="phase === 'scanning'" @click="picking = true">
+          浏览…
+        </button>
         <button :disabled="phase === 'scanning'" @click="scan">
           {{ phase === "scanning" ? "扫描中…" : "扫描" }}
         </button>
       </div>
+      <p v-if="roots.length" class="roots-hint">
+        可访问根目录：{{ roots.join(" · ") }}
+      </p>
       <ProgressBar v-if="phase === 'scanning'" :elapsed="elapsed" />
       <p v-if="message" class="ok">{{ message }}</p>
       <p v-if="error" class="err">{{ error }}</p>
@@ -216,6 +224,14 @@ function exportPlan() {
       </div>
     </section>
 
+    <DirectoryPicker
+      v-if="picking"
+      :model-value="root"
+      :roots="roots"
+      @update:model-value="root = $event"
+      @close="picking = false"
+    />
+
     <footer>
       <p>执行前一定先看一遍目标路径；没有 GPS 的文件默认原地不动。</p>
     </footer>
@@ -249,6 +265,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.ghost { background: transparent; }
 .filters .counts { color: var(--muted); margin-left: auto; }
 .actions { justify-content: flex-end; }
+.roots-hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 .ok { color: var(--ok); margin: 10px 0 0; }
 .err { color: var(--err); margin: 10px 0 0; }
 footer { color: var(--muted); font-size: 12px; }

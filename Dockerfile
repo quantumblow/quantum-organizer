@@ -39,4 +39,4 @@ HEALTHCHECK --interval=30s --timeout=5s --start-period=25s --retries=3 \
   CMD python -c "import urllib.request;urllib.request.urlopen('http://localhost:8080/healthz')"
 
 ENTRYPOINT ["qorg"]
-CMD ["serve", "--data", "/data", "--port", "8080"]
+CMD ["serve"]
