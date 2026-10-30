@@ -154,9 +154,9 @@ async function runApply(dryRun) {
     const paths = selected.value.size ? Array.from(selected.value) : null;
     const body = await applyPlan(planId.value, { paths, dry_run: dryRun });
     if (dryRun) {
-      // 演练没动任何文件：计划仍然有效，必须回到 ready，否则执行按钮永久禁用
+      // 预览没动任何文件：计划仍然有效，必须回到 ready，否则执行按钮永久禁用
       phase.value = "ready";
-      message.value = `演练完成：${body.steps} 步，未改动任何文件`;
+      message.value = `预览完成：${body.steps} 步，未改动任何文件`;
       return;
     }
     lastOp.value = body.op_id;
@@ -287,10 +287,11 @@ function exportPlan() {
       </div>
 
       <div class="row actions">
-        <button :disabled="!planId" @click="runApply(true)">演练（不改文件）</button>
-        <button class="primary" :disabled="!canApply" @click="runApply(false)">
-          执行所选（{{ selected.size }}）
+        <span class="selected-count">{{ selected.size ? `已选 ${selected.size}` : "未选择文件" }}</span>
+        <button :disabled="!planId" title="只看会发生什么，不改动任何文件" @click="runApply(true)">
+          预览
         </button>
+        <button class="primary" :disabled="!canApply" @click="runApply(false)">执行</button>
         <button class="ghost" :disabled="!lastOp" @click="undoLast">撤销本次</button>
         <button class="ghost" @click="exportPlan">导出结果 JSON</button>
       </div>
@@ -337,6 +338,7 @@ button.primary { background: var(--accent); border-color: var(--accent); color: 
 button.ghost { background: transparent; }
 .filters .counts { color: var(--muted); margin-left: auto; }
 .actions { justify-content: flex-end; }
+.selected-count { color: var(--muted); margin-right: 4px; }
 .roots-hint { color: var(--muted); font-size: 12px; margin: 8px 0 0; }
 .naming { margin-top: 14px; }
 .chk { display: inline-flex; gap: 6px; align-items: center; color: var(--ink); }
