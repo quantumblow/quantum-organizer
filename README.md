@@ -54,6 +54,12 @@ is rejected:
 
 - `qorg serve` with no arguments defaults to `~/Pictures` and `~/Videos` (falls back to `/data` in the image)
 - several roots: `--data ~/Pictures --data /mnt/nas/DCIM`, or `QORG_DATA_ROOTS="/a:/b"`
+
+**Mounting a directory is not the same as granting access.** `-v "$HOME:$HOME"` only makes the path
+exist inside the container; what you can browse and scan is decided by `QORG_DATA_ROOTS`, and
+anything outside those roots is a 400. So "home is mounted but only the `-e` dirs are browsable" is
+by design — widen it with `-e QORG_DATA_ROOTS="$HOME"`. This repo's `launch.sh` grants the whole
+`$HOME` by default (`QORG_DATA_ROOTS=... ./launch.sh` narrows it).
 - **Browse…** lists folders on demand and reports unreadable ones instead of failing
 
 ```bash

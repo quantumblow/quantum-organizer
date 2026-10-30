@@ -51,6 +51,17 @@ WebUI 能碰的目录由你决定，服务端会拒绝根目录之外的路径�
 
 - 不给参数时，`qorg serve` 默认用 `~/Pictures` 和 `~/Videos`（存在则用，容器里都没有时退回 `/data`）
 - 多个根：`--data ~/Pictures --data /mnt/nas/DCIM`，或环境变量 `QORG_DATA_ROOTS="/a:/b"`
+
+**挂载了目录不等于允许访问。** 容器里 `-v "$HOME:$HOME"` 只是让路径在容器里存在；能浏览到哪、
+能扫描哪，由 `QORG_DATA_ROOTS` 决定，根目录之外一律 400。所以「挂了整个 home 但浏览只能用
+`-e` 里那几个目录」是设计如此，不是挂载失败——把 `-e QORG_DATA_ROOTS="$HOME"` 就放开了。
+本仓库的 `launch.sh` 默认就是整个 `$HOME`：
+
+```bash
+./launch.sh                                                   # 整个 $HOME
+QORG_DATA_ROOTS="$HOME/Pictures:$HOME/Videos" ./launch.sh     # 只放开相册
+PORT=8081 ./launch.sh                                         # 换端口
+```
 - WebUI 的「浏览…」是按需列目录的，遇到没有读取权限的目录会提示换一个，不会让整次浏览失败
 
 命令行同样能跑（同一个镜像）：

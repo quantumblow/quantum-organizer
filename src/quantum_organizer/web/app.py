@@ -98,7 +98,12 @@ def create_app(
         if roots and not any(_inside(candidate, root) for root in roots):
             allowed = ", ".join(str(r) for r in roots)
             raise HTTPException(
-                status_code=400, detail=f"path must be inside one of: {allowed}"
+                status_code=400,
+                detail=(
+                    f"path must be inside one of: {allowed} "
+                    "(挂载了目录不等于允许访问：还要把它加进 QORG_DATA_ROOTS，"
+                    "容器里用 -e QORG_DATA_ROOTS=/path:/other)"
+                ),
             )
         return candidate
 

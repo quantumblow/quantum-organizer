@@ -116,3 +116,15 @@ def test_readonly_state_surfaces_a_500_with_a_hint(tmp_path, monkeypatch):
     body = resp.json()
     assert "not writable" in body["detail"]
     assert "chown" in body["hint"]
+
+
+def test_out_of_root_error_explains_how_to_grant_access(tmp_path):
+    media = tmp_path / "media"
+    media.mkdir()
+    client = TestClient(create_app(state_dir=tmp_path / "state", data_roots=[media]))
+
+    resp = client.get("/api/v1/browse", params={"path": str(tmp_path)})
+    assert resp.status_code == 400
+    detail = resp.json()["detail"]
+    assert str(media) in detail
+    assert "QORG_DATA_ROOTS" in detail
