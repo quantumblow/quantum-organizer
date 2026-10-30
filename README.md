@@ -47,6 +47,24 @@ qorg undo  --root ~/Pictures/messy
 qorg serve --data ~/Pictures --port 8080
 ```
 
+## Building the image
+
+The image needs `quantum-locator`. Either build its wheel locally (no PyPI, no npm):
+
+```bash
+cd ../quantum-locator && python -m build --wheel -o ../quantum-organizer/docker/wheels
+cd ../quantum-organizer && docker build -t quantum-organizer:dev .
+```
+
+or `docker build .` once the locator is on PyPI. Behind a proxy:
+
+```bash
+docker build --network=host \
+  --build-arg HTTP_PROXY=http://127.0.0.1:7897 \
+  --build-arg HTTPS_PROXY=http://127.0.0.1:7897 \
+  -t quantum-organizer:dev .
+```
+
 ## Rules and limitations
 
 See [`docs/rules/naming.md`](docs/rules/naming.md) — the single source of truth for both this

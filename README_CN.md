@@ -93,6 +93,28 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 | `QORG_STATE_DIR` | `~/.local/state/quantum-organizer` | 计划/历史/缓存位置 |
 | `QORG_GEOCODER_URL` | 空 | 设成 `http://host:8899` 改用外部 `quantum-locator` 服务 |
 
+## 构建镜像
+
+镜像需要 `quantum-locator`，两条路选一条：
+
+```bash
+# A. 本地 wheel（不需要发布到 PyPI，也不需要 npm）
+cd ../quantum-locator && python -m build --wheel -o ../quantum-organizer/docker/wheels
+cd ../quantum-organizer && docker build -t quantum-organizer:dev .
+
+# B. 已发布到 PyPI 后直接构建
+docker build -t quantum-organizer:dev .
+```
+
+本机若需要代理才能访问 apt / PyPI，构建时把代理传进去（不要让容器用 `172.17.0.1`）：
+
+```bash
+docker build --network=host \
+  --build-arg HTTP_PROXY=http://127.0.0.1:7897 \
+  --build-arg HTTPS_PROXY=http://127.0.0.1:7897 \
+  -t quantum-organizer:dev .
+```
+
 ## 部署
 
 - 单镜像单端口 8080，`/data` 素材、`/state` 状态，`HEALTHCHECK` 打 `/healthz`。
