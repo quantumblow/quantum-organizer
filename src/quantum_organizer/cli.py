@@ -6,6 +6,7 @@ import importlib.util
 import os
 import platform
 import shutil
+import sqlite3
 from pathlib import Path
 
 import typer
@@ -56,6 +57,38 @@ def media_roots(cli_roots: list[Path] | None) -> list[Path]:
     return [home]
 
 
+def state_writable_probe(path: Path) -> str | None:
+    """Return None when ``path`` is writable, else a short reason.
+
+    Opens a throwaway SQLite database, because a plain file write can succeed while SQLite still
+    refuses to write (journals, ownership, read-only mounts) — that is the failure users hit.
+    """
+    db = path / ".qorg-probe.db"
+    try:
+        path.mkdir(parents=True, exist_ok=True)
+        conn = sqlite3.connect(db)
+        try:
+            conn.execute("CREATE TABLE probe (x INTEGER)")
+            conn.commit()
+        finally:
+            conn.close()
+        db.unlink()
+    except (OSError, sqlite3.Error) as exc:
+        return str(exc)
+    return None
+
+
+def _readonly_hint(path: Path) -> str:
+    """Explain the classic Docker bind/volume ownership trap in one place."""
+    return (
+        f"状态目录不可写：{path}\n"
+        "通常是旧的 Docker 卷由 root 创建（老镜像以 root 运行），而现在镜像以 uid 1000 运行。\n"
+        "修复（保留历史记录）：\n"
+        "  docker run --rm -v <你的卷>:/state python:3.12-slim chown -R 1000:1000 /state\n"
+        "或者换一个新卷；绑挂载目录则 chown 一次即可。"
+    )
+
+
 def _install_hint() -> str:
     if platform.system() == "Darwin":
         return "brew install ffmpeg exiftool"
@@ -68,6 +101,8 @@ def doctor_report() -> dict[str, str]:
     has_locator = importlib.util.find_spec("quantum_locator") is not None
     report["quantum_locator"] = "installed" if has_locator else "missing"
     report["state_dir"] = str(state_dir())
+    probe_error = state_writable_probe(state_dir())
+    report["state_writable"] = "yes" if probe_error is None else f"no ({probe_error})"
     missing = [n for n in _EXTERNAL_TOOLS if report[n] == "missing"]
     report["hint"] = _install_hint() if missing else "all external tools present"
     return report
@@ -226,6 +261,11 @@ def serve(
     import uvicorn
 
     from quantum_organizer.web.app import create_app
+
+    probe_error = state_writable_probe(state_dir())
+    if probe_error is not None:
+        typer.echo(_readonly_hint(state_dir()))
+        raise typer.Exit(EXIT_BLOCKED)
 
     roots = media_roots(data)
     for root in roots:

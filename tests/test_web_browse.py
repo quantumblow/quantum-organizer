@@ -92,3 +92,27 @@ def test_plan_still_rejects_roots_outside_the_allowed_list(client):
     resp = client.post("/api/v1/plans", json={"root": "/etc"})
     assert resp.status_code == 400
     assert "inside one of" in resp.json()["detail"]
+
+
+def test_readonly_state_surfaces_a_500_with_a_hint(tmp_path, monkeypatch):
+    """sqlite 写不进去时，前端要看到可操作的提示，而不是裸 traceback。"""
+    import sqlite3
+
+    from quantum_organizer.pipeline import Pipeline
+
+    app = create_app(state_dir=tmp_path / "state", data_roots=[tmp_path])
+    client = TestClient(app)
+
+    def boom(self, plan, options=None):
+        raise sqlite3.OperationalError("attempt to write a readonly database")
+
+    monkeypatch.setattr(Pipeline, "save_plan", boom)
+    root = tmp_path / "media"
+    root.mkdir()
+    (root / "A.jpg").write_bytes(b"\xff\xd8\xff\xd9")
+
+    resp = client.post("/api/v1/plans", json={"root": str(root)})
+    assert resp.status_code == 500
+    body = resp.json()
+    assert "not writable" in body["detail"]
+    assert "chown" in body["hint"]

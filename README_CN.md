@@ -126,6 +126,27 @@ cd frontend && npm install && npm run build   # 产物写入 src/quantum_organiz
 | `QORG_STATE_DIR` | `~/.local/state/quantum-organizer` | 计划/历史/缓存位置 |
 | `QORG_GEOCODER_URL` | 空 | 设成 `http://host:8899` 改用外部 `quantum-locator` 服务 |
 
+## 常见问题
+
+**`attempt to write a readonly database`**
+
+状态目录（容器里是 `/state`）不可写。最常见的原因是那个 Docker 卷是**老镜像（root 运行）**
+创建的，文件属主是 root，而现在的镜像以 uid 1000 运行。`qorg serve` 启动时会先探测一次，
+不通过就直接拒绝启动并打印修复命令；也可以用 `qorg doctor` 看 `state_writable` 一行。
+
+修复（保留已有计划和历史）：
+
+```bash
+docker run --rm -v qorg-state:/state python:3.12-slim chown -R 1000:1000 /state
+```
+
+或者换一个新卷。绑挂载目录则是 `sudo chown -R 1000:1000 你的状态目录`。
+
+**扫出来的文件全是 `keep` / 不移动**
+
+说明这些文件里没有 GPS：无人机视频的 GPS 在字幕轨（DJI）或元数据里，剪辑/转码后的导出
+通常会把轨道丢干净。用 `ffprobe -show_streams` 只看到 video/audio 两个流，就属于这种情况。
+
 ## 构建镜像
 
 镜像需要 `quantum-locator`，两条路选一条：

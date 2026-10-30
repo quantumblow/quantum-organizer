@@ -9,11 +9,12 @@ from __future__ import annotations
 
 import asyncio
 import json
+import sqlite3
 from pathlib import Path
 from typing import Any
 
-from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
+from fastapi import FastAPI, HTTPException, Query, Request
+from fastapi.responses import JSONResponse, StreamingResponse
 from fastapi.staticfiles import StaticFiles
 from pydantic import BaseModel, Field
 
@@ -105,6 +106,20 @@ def create_app(
         return Pipeline(
             state,
             geocoder=Geocoder(allow_estimate=allow_estimate),
+        )
+
+    @app.exception_handler(sqlite3.OperationalError)
+    def _sqlite_error(request: Request, exc: sqlite3.OperationalError) -> JSONResponse:
+        # 典型场景：Docker 卷是老镜像（root）创建的，现在以 uid 1000 运行
+        return JSONResponse(
+            status_code=500,
+            content={
+                "detail": f"state directory is not writable: {exc}",
+                "hint": (
+                    "状态目录（容器里是 /state）不可写。若这是老镜像创建的 Docker 卷，执行："
+                    " docker run --rm -v <卷>:/state python:3.12-slim chown -R 1000:1000 /state"
+                ),
+            },
         )
 
     @app.get("/healthz")

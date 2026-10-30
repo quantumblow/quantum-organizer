@@ -81,6 +81,24 @@ qorg undo  --root ~/Pictures/messy
 qorg serve --data ~/Pictures --port 8080
 ```
 
+## Troubleshooting
+
+**`attempt to write a readonly database`**
+
+The state directory (``/state`` in Docker) is not writable — usually because the volume was created
+by an older image that ran as root, while the current image runs as uid 1000. `qorg serve` probes
+writability at startup, refuses to start and prints the fix; `qorg doctor` shows `state_writable`.
+
+```bash
+docker run --rm -v qorg-state:/state python:3.12-slim chown -R 1000:1000 /state
+```
+
+**Every file comes out as `keep`**
+
+Those files carry no GPS. Drone footage keeps it in a subtitle/metadata track, and edited or
+re-encoded exports usually drop it — if `ffprobe -show_streams` shows only video and audio, that is
+the whole story.
+
 ## Building the image
 
 The image needs `quantum-locator`. Either build its wheel locally (no PyPI, no npm):
