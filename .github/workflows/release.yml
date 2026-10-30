@@ -16,6 +16,8 @@ jobs:
           repository: quantumblow/quantum-locator
           ref: v0.1.0
           path: locator
+          # 上游是私有仓库，默认 GITHUB_TOKEN 读不到它
+          token: ${{ secrets.LOCATOR_REPO_TOKEN }}
       - uses: actions/setup-python@v5
         with: { python-version: "3.12" }
       - name: Build the locator wheel for the image

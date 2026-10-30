@@ -133,7 +133,8 @@ make lint     # ruff + mypy
 make fmt      # ruff format
 ```
 
-CI：Python 3.12/3.13 矩阵跑 ruff + mypy + pytest；docker job 会 checkout `quantumblow/quantum-locator`、本地打 wheel 再建镜像，并对镜像跑一次 `qorg doctor` 与 locator 导入冒烟——因此上游 locator 还没上 PyPI 时 CI 也能绿。
+CI：Python 3.12/3.13 矩阵跑 ruff + mypy + pytest；docker job 会 checkout `quantumblow/quantum-locator`、本地打 wheel 再建镜像，并对镜像跑一次 `qorg doctor` 与 locator 导入冒烟——因此上游 locator 还没上 PyPI 时 CI 也能绿。上游仓库目前私有，需要在
+Settings → Secrets 里配置 `LOCATOR_REPO_TOKEN`（fine-grained PAT，对 quantum-locator 仅给 Contents: Read）。
 
 ## 许可
 
