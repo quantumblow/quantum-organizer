@@ -17,9 +17,11 @@ WORKDIR /app
 COPY pyproject.toml README.md ./
 COPY src ./src
 COPY docker/wheels/ /tmp/wheels/
-RUN pip install --no-cache-dir --upgrade pip \
-    && (pip install --no-cache-dir /tmp/wheels/*.whl || pip install --no-cache-dir "$LOCATOR_SPEC") \
-    && pip install --no-cache-dir .
+# pip 下载缓存挂在 BuildKit cache 上：重建镜像时不用重新拉一遍依赖（断网/慢网很关键）
+RUN --mount=type=cache,target=/root/.cache/pip \
+    pip install --upgrade pip \
+    && (pip install /tmp/wheels/*.whl || pip install "$LOCATOR_SPEC") \
+    && pip install .
 
 # 可选：用外部 locator 服务代替内置解析
 # ENV QORG_GEOCODER_URL=http://quantum-locator:8899

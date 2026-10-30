@@ -153,12 +153,16 @@ async function runApply(dryRun) {
   try {
     const paths = selected.value.size ? Array.from(selected.value) : null;
     const body = await applyPlan(planId.value, { paths, dry_run: dryRun });
+    if (dryRun) {
+      // 演练没动任何文件：计划仍然有效，必须回到 ready，否则执行按钮永久禁用
+      phase.value = "ready";
+      message.value = `演练完成：${body.steps} 步，未改动任何文件`;
+      return;
+    }
     lastOp.value = body.op_id;
     phase.value = "done";
-    message.value = dryRun
-      ? `演练完成：${body.steps} 步，未改动任何文件`
-      : `执行完成（op ${body.op_id}）：${body.steps} 步`;
-    if (!dryRun) await loadPage(page.value);
+    message.value = `执行完成（op ${body.op_id}）：${body.steps} 步`;
+    await loadPage(page.value);
   } catch (e) {
     phase.value = "ready";
     error.value = String(e.message || e);

@@ -133,6 +133,8 @@ class OpRecord:
     options_json: str
     status: str
     steps: list[StepRecord] = field(default_factory=list)
+    #: 演练时不会有步骤记录，用这个数字告诉界面「本会执行多少步」
+    planned: int = 0
 
 
 @dataclass

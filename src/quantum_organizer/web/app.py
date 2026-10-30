@@ -223,7 +223,7 @@ def create_app(
         return {
             "op_id": record.op_id,
             "status": record.status,
-            "steps": len(record.steps),
+            "steps": len(record.steps) or record.planned,
         }
 
     @app.get("/api/v1/ops/{op_id}")

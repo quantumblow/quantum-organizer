@@ -190,7 +190,9 @@ def apply_plan(
     op_id = history.begin("apply", plan.root, opts.to_json())
     if dry_run:
         history.finish(op_id, "planned")
-        return history.get(op_id)
+        record = history.get(op_id)
+        record.planned = len(actions)  # 演练不写步骤，只回报「会做几步」
+        return record
 
     seq = 0
     failed = False
