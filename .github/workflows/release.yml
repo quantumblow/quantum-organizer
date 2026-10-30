@@ -10,6 +10,16 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Checkout quantum-locator (pinned release tag)
+        uses: actions/checkout@v4
+        with:
+          repository: quantumblow/quantum-locator
+          ref: v0.1.0
+          path: locator
+      - uses: actions/setup-python@v5
+        with: { python-version: "3.12" }
+      - name: Build the locator wheel for the image
+        run: pip wheel ./locator --no-deps -w docker/wheels
       - uses: docker/setup-buildx-action@v3
       - uses: docker/login-action@v3
         with:
@@ -24,11 +34,11 @@ jobs:
           tags: |
             ghcr.io/${{ github.repository }}:${{ github.ref_name }}
             ghcr.io/${{ github.repository }}:latest
-      - name: Publish python package
+      - name: Build the python package
         run: |
-          pip install build twine
+          pip install build
           python -m build
-          twine upload dist/* || echo "PyPI upload skipped (configure trusted publishing first)"
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.PYPI_TOKEN }}
+      - name: Upload to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_TOKEN }}
